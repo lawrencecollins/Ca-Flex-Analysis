@@ -13,7 +13,16 @@ data_types = {'Well ID' : str, 'Compound' : str, 'Protein': str, 'Concentration'
 
 # EMPTY MAP GENERATION
 def empty_map(size = 96, valid = True):
-    """generates an empty platemap of defined size"""
+    """Returns an empty platemap of defined size.
+    
+    Contains the columns 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. Empty map is used as the template when generated filled plate maps from csv files. 
+    
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
+    :param type: int
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
+    :type valid: bool
+    :return: Pandas Dataframe of an empty plate map
+    """
     
     # import alphabet for row labels
     letters = list(string.ascii_uppercase)
@@ -52,7 +61,17 @@ def empty_map(size = 96, valid = True):
 
 # PLATE DF GENERATION FROM LONG HAND MAP
 def plate_map(file, size = 96, valid = True):
-    """generates a dataframe from a 'long' plate map csv file that defines each and every well from a well plate of defined size"""
+    """Returns a dataframe from a 'long' plate map csv file that defines each and every well from a well plate of defined size
+    
+    Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". Dataframe contains headers such as 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. The csv file contains headers on line 2 and a well ID in the first column for every well in the plate.
+    An example csv template can be found here: 'long map example.csv'
+    
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
+    :param type: int
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
+    :type valid: bool
+    :return: Pandas Dataframe of a defined plate map
+    """
     # substitute values w/ new plate map
     df = pd.read_csv(file, skiprows = 1, dtype = data_types, skipinitialspace = True)
 
@@ -75,7 +94,16 @@ def plate_map(file, size = 96, valid = True):
 
 # PLATE DF GENERATION FROM SHORT HAND MAP
 def short_map(file, size = 96, valid = True):
-    """generates a dataframe from a 'short' plate map csv file that defines each and every well from a well plate of defined size"""
+    """Returns a dataframe from a 'short' plate map csv file that defines each and every well from a well plate of defined size
+    
+    Contains the columns 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". 
+    
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
+    :param type: int
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
+    :type valid: bool
+    :return: Pandas Dataframe of a defined plate map
+    """
 
     # read in short map 
     df = pd.read_csv(file, skiprows = 1, skipinitialspace = True)
@@ -115,24 +143,57 @@ def short_map(file, size = 96, valid = True):
 # The next 3 functions are used to simplify 'visualise' function that follows: 
 
 # hatches are defined to clearly show invalidated wells
-hatchdict = {"True":"", "False":"////"}
+hatchdict = {"True":("", 'black'), "False":("//////", 'red')}
 
 # fontsize will scale font size of visualisaiton to the well plate size (avoids overlapping text)
-def fontsize(sizeby, size): 
-    """returns a font size defined by the length of the string and size of the well plate
-    (larger well plate and/or longer string = smaller font size."""
-    return (8 - math.log10(len(str(sizeby)))*2 - math.log10(size)*1.5)
+def fontsize(sizeby, plate_size): 
+    """Returns a font size defined by the length of the string and size of the well plate
+    
+    Larger well plate and/or longer string = smaller font size.
+    
+    :param sizeby: String that requires a corresponding font size
+    :type sizeby: String or list of strings
+    :param plate_size: Scalable integer, the size of the well plate
+    :var plate_size: Larger value corresponds with smaller fontsize, size of well plate is used in the following instances of the function
+    :type plate_size: int
+    :return: float corresponding to a scaled font size 
+    :rtype: float
+    """
+    return (8 - math.log10(len(str(sizeby)))*2 - math.log10(plate_size)*1.5)
 
 # adds labels according to label stipulations (avoids excessive if statements in the visualise function)
 def labelwell(platemap, labelby, iterrange):
-    """returns label for each row of a stipulated column"""
+    """Returns label for each row of a stipulated column.
+    
+    Used to return the appropriate, formatted label from a specified platemap at every well. Empty wells will always return 'empty'. 
+    
+    :param platemap: Platemap that contains the required labels
+    :type platemap: pandas dataframe
+    :param labelby: Dataframe column to label by, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
+    :type labelby: str
+    :param iterrange: Number of instances to itterate over, typically the size of the platemap
+    :type iterrange: int
+    """
     if platemap['Type'].iloc[iterrange] == 'empty':
         return "empty"
     else:
         return str(platemap[labelby].iloc[iterrange]).replace(" ", "\n")
     
 def wellcolour(platemap, colorby, colormap, iterrange):
-    """returns a unique colour for each label or defined condition"""
+    """Returns a unique colour for each label or defined condition.
+    
+    Wellcolour generates a dictionary of colours for each unique label. This can be used to colour code figures to a defined label. 
+    
+    :param platemap: Platemap that contains the required labels
+    :type platemap: pandas dataframe
+    :param colorby: Dataframe column to colour code, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
+    :type colorby: str
+    :type colormap: Colour map that generates a customisable list of colours
+    :param iterrange: Number of instances to itterate over, typically the size of the platemap
+    :type iterrange: int
+    :return: RGB array of a colour that corresponds to a unique label
+    :rtype: numpy array
+    """
     # unique strings in the defined column are used as the list of labels, converted to strings to avoid errors.
     types = [str(i) for i in list(platemap[colorby].unique())]
     cmap = plt.get_cmap(colormap)
@@ -145,7 +206,29 @@ def wellcolour(platemap, colorby, colormap, iterrange):
 
 def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paired',
              colorby = 'Type', labelby = 'Type', dpi = 150):
-    """returns a visual representation of the platemap"""
+    """Returns a visual representation of the plate map.
+    
+    The label and colour for each well can be customised to be a variable, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'. The size of the plate map used to generate the figure can be either 6, 12, 24, 48, 96 or 384. 
+    
+    :param platemap: Plate map to plot
+    :type platemap: pandas dataframe
+    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
+    :type size: int    
+    :param export: If 'True' a .png file of the figure is saved, default = False
+    :type export: bool
+    :param title: Sets the title of the figure, optional
+    :type title: str
+    :param colormap: Sets the colormap for the color-coding, default = 'Paired'
+    :type colormap: str
+    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
+    :type colorby: str
+    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
+    :type labelby: str
+    :param dpi: Size of the figure, default = 150
+    :type dpi: int
+    :return: Visual representation of the plate map.
+    :rtype: figure
+    """
     fig = plt.figure(dpi = dpi)
     # define well plate grid according to size of well plate 
     # an extra row and column is added to the grid to house axes labels
@@ -181,55 +264,178 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
                 
             else:
                 ax.add_artist(plt.Circle((0.5, 0.5), 0.49, facecolor=wellcolour(platemap, colorby, colormap, i), 
-                                          edgecolor='black', lw=0.5, hatch = hatchdict[str(platemap['Valid'].iloc[i])]))
+                                          edgecolor=hatchdict[str(platemap['Valid'].iloc[i])][1], lw=0.5, 
+                                          hatch = hatchdict[str(platemap['Valid'].iloc[i])][0]))
             
             # LABELS
             ax = fig.add_subplot(grid[(ord(platemap['Row'].iloc[i].lower())-96), ((platemap['Column'].iloc[i]))])
             
             # nan option allows a blank label if there is nothing stipulated for this label condition
-            if str(platemap[labelby].iloc[i]) == 'nan':
-                pass
-            else:
+            if str(platemap[labelby].iloc[i]) != 'nan':
                 ax.text(0.5, 0.5, labelwell(platemap, labelby, i), 
-                        size = str(fontsize(sizeby = platemap[labelby].iloc[i], size = size)), 
+                        size = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)), 
                         wrap = True, ha = "center", va="center")
     # add title 
+    plt.suptitle('{}'.format(title))
+    
+    # provides option to save well plate figure 
+    if export == True:
+        plt.savefig('{}_map.png'.format(title))
+
+
+        
+def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False, colormap = 'Dark2_r',
+             colorby = 'Type', labelby = 'Type', dpi = 200):
+    """Returns a plot for each series, the location on the grid corresponding to the location of each assay on the well plate.
+    :param x: Data to be plotted on x axis, length of data must equal length of the platemap
+    :type x: List of floats or dataframe column
+    :param y: Data to be plotted on y axis, length of data must equal length of the platemap
+    :type y: List of floats or dataframe column
+    :param platemap: Plate map to plot
+    :type platemap: pandas dataframe
+    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
+    :type size: int    
+    :param export: If 'True' a .png file of the figure is saved, default = False
+    :type export: bool
+    :param title: Sets the title of the figure, optional
+    :type title: str
+    :param colormap: Sets the colormap for the color-coding, default = 'Dark2_r'
+    :type colormap: str
+    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
+    :type colorby: str
+    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
+    :type labelby: str
+    :param dpi: Size of the figure, default = 200
+    :type dpi: int
+    :return: Figure of plotted data for each well of the well plate described in the plate map and the x and y series.
+    :rtype: figure
+    """
+    
+    fig = plt.figure(dpi = dpi)
+    # define well plate grid according to size of well plate 
+    # an extra row and column is added to the grid to house axes labels
+    grid = gridspec.GridSpec((wells[size])[0]+1, (wells[size])[1]+1, wspace=0.1, hspace=0.1, figure = fig)
+
+    # plot row labels in extra row
+    for i in range(1, (wells[size])[0]+1):
+        ax = plt.subplot(grid[i, 0])
+        ax.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.text(0.5, 0.5, list(string.ascii_uppercase)[i-1], size = 10, ha = "center", va="center")
+        
+    # plot column labels in extra column
+    for i in range(1, (wells[size])[1]+1):
+        ax = plt.subplot(grid[0, i])
+        ax.axis('off')
+        ax.text(0.5, 0.5, list(range(1, (wells[size])[1]+1))[i-1], size = 8, ha = "center", va="center")
+        
+    # plot plate types in grid, color code and label
+    for i in range(size):
+        # color code
+        ax = plt.subplot(grid[(ord(platemap['Row'].iloc[i].lower())-96), ((platemap['Column'].iloc[i]))])
+        ax.axis('off')
+        ax.plot(x.iloc[i], y.iloc[i], lw = 0.5, color = wellcolour(platemap, colorby, colormap, i), 
+                label = labelwell(platemap, labelby, i))
+        
+        if platemap['Valid'].iloc[i] == False:
+            ax.plot([x.iloc[i, 0], x.iloc[i, -1]], [y.iloc[i, 0]-(y.iloc[i, 0]*0.2), y.iloc[i, -1]+(y.iloc[i, -1]*0.05)], color = 'red')
+        
+        
+        
+        # add label for each well
+        legend = ax.legend(loc = 'lower center', fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)),
+                 frameon = False, markerscale = 0)
+        
+        # remove legend line (keeps only the label text)
+        for item in legend.legendHandles:
+            item.set_visible(False)
+    
     fig.suptitle('{}'.format(title))
     
     # provides option to save well plate figure 
     if export == True:
         plt.savefig('{}_map.png'.format(title))
-    else:
-        pass
-
-
-# Puts the assay data into a suitable form to aid future analysis
-def readandmap(data, platemap, size = 96):
-    """returns a timemap and datamap as a tuple"""
-    # create dataframe from .txt file 
-    def read_in(data):
-        df = pd.read_csv(data, delimiter='\t', skiprows = 2, skipfooter=3, engine = 'python', encoding = 'mbcs') 
-        return df
-    # read in assay data 
-    df = read_in(data)
-    # create new dataframe containing all time values for each well
-    dftime = df.filter(regex = 'T$', axis = 1)
-    # edit header names (this will come in handy in a second)
-    dftime.columns = dftime.columns.str.replace('T', "")
-    # extract list of header names 
-    wellslist = list(dftime.columns.values)
-    # transpose x and y axes of dataframe - generate time 'rows'
-    dftime = dftime.transpose()
-    # join time rows to plate map, generating plate map that contains time values
-    timemap = platemap.join(dftime)
-
-    # create new dataframe containing data measurements for each cell
-    dfdata = df[wellslist]
-    # transpose x and y axes
-    dfdata = dfdata.transpose()
-    # join to plate map 
-    datamap = platemap.join(dfdata)
+        
+        
+def wellcolour2(platemap, colorby, colormap, itter, to_plot):
+    """Returns a unique colour for each label or defined condition.
     
-    # return timemap and datamap as a tuple
-    return timemap, datamap
+    Wellcolour2 generates a dictionary of colours for each unique label. This can be used to colour code figures to a defined label. This function is different to wellcolour in that colours are located by loc instead of iloc.
+    
+    :param platemap: Platemap that contains the required labels
+    :type platemap: pandas dataframe
+    :param colorby: Dataframe column to colour code, insert header name, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type', default = 'Type'
+    :type colorby: str
+    :type colormap: Colour map that generates a customisable list of colours
+    :param iter: Number of instances to itterate over, typically the size of the platemap
+    :type iter: int
+    :param to_plot: Wells to plot
+    :type to_plot: str or list of str
+    :return: RGB array of a colour that corresponds to a unique label
+    :rtype: numpy array
+    """
+    # unique strings in the defined column are used as the list of labels, converted to strings to avoid errors.
+    types = [str(i) for i in list(platemap[colorby].unique())]
+    cmap = plt.get_cmap(colormap)
+    # get equally spaced colour values
+    colors = cmap(np.linspace(0, 1, len(types)))
+    colordict = dict(zip(types, colors))
+    colordict['nan'] = 'yellow'
+    color = colordict.get(str(platemap[colorby].loc[to_plot[itter]]))
+    return color
 
+def invalidate_wells(platemap, wells, valid = False):
+    """Returns updated plate map with specified wells invalidated.
+    
+    :param platemap: Plate map to use
+    :type platemap: pandas dataframe
+    :param wells: Well or wells to invalidate, e.g. ("A1", "B1", "C1")
+    :type wells: string or list of strings
+    :param valid: Sets the stipulated well 'True' or 'False', default = False
+    :type valid: bool
+    :return: Returns updated plate map
+    :rtype: pandas dataframe
+    """
+    platemap.loc[wells, 'Valid'] = valid 
+    return platemap
+def invalidate_rows(platemap, rows, valid = False):
+    """Returns updated plate map with specified rows invalidated.
+    
+    :param platemap: Plate map to use
+    :type platemap: pandas dataframe
+    :param wells: Rows to invalidate, e.g. ("A", "B", "C")
+    :type wells: list of strings
+    :param valid: Sets the stipulated row or rows 'True' or 'False', default = False
+    :type valid: bool
+    :return: Returns updated plate map
+    :rtype: pandas dataframe
+    """
+    platemap.loc[platemap.index.str.startswith(rows), 'Valid'] = valid
+    return platemap
+
+def invalidate_cols(platemap, cols, valid = False):
+    """Returns updated plate map with specified columns invalidated.
+    
+    :param platemap: Plate map to use
+    :type platemap: pandas dataframe
+    :param wells: Columns to invalidate, e.g. 1, 2, 3
+    :type wells: int or list of ints
+    :param valid: Sets the stipulated column or columns 'True' or 'False', default = False
+    :type valid: bool
+    :return: Returns updated plate map
+    :rtype: pandas dataframe
+    """
+    # if/else circumvents a slight bug - if cols contains just 1 value python doesn't recognise it as a list
+    if type(cols) != int:
+        cols = list(map(str, cols))
+    else:
+        cols = str(cols)
+    letters = list(string.ascii_uppercase)
+    rows = letters[0:(wells[platemap.shape[0]])[0]]
+    delcols = list(cols)*len(rows)
+    delcols.sort()
+    delrows = rows*len(str(cols))
+    ids = [i+str(j) for i, j in zip(delrows, delcols)]
+    platemap.loc[ids, 'Valid'] = valid
+    return platemap
