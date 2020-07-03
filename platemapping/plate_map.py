@@ -17,9 +17,9 @@ def empty_map(size = 96, valid = True):
     
     Contains the columns 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. Empty map is used as the template when generated filled plate maps from csv files. 
     
-    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, optional 
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
     :param type: int
-    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, optional
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
     :type valid: bool
     :return: Pandas Dataframe of an empty plate map
     """
@@ -63,11 +63,11 @@ def empty_map(size = 96, valid = True):
 def plate_map(file, size = 96, valid = True):
     """Returns a dataframe from a 'long' plate map csv file that defines each and every well from a well plate of defined size
     
-    Contains the columns 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". 
+    Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". Dataframe contains headers such as 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. The csv file contains headers on line 2 and a well ID in the first column for every well in the plate.
     
-    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, optional 
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
     :param type: int
-    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, optional
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
     :type valid: bool
     :return: Pandas Dataframe of a defined plate map
     """
@@ -97,9 +97,9 @@ def short_map(file, size = 96, valid = True):
     
     Contains the columns 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". 
     
-    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, optional 
+    :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
     :param type: int
-    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, optional
+    :param valid: Validates every well - 'True' sets every well as valid, 'False' wells will not be used for analysis, default = True
     :type valid: bool
     :return: Pandas Dataframe of a defined plate map
     """
@@ -145,16 +145,18 @@ def short_map(file, size = 96, valid = True):
 hatchdict = {"True":"", "False":"////"}
 
 # fontsize will scale font size of visualisaiton to the well plate size (avoids overlapping text)
-def fontsize(sizeby, size): 
+def fontsize(sizeby, plate_size): 
     """Returns a font size defined by the length of the string and size of the well plate
     
     Larger well plate and/or longer string = smaller font size.
     
     :param sizeby: String that requires a corresponding font size
     :type sizeby: String or list of strings
-    :param size: Scalable integer
-    :var size: Larger value corresponds with smaller fontsize, size of well plate is used in the following instances of the function
-    :type size: int
+    :param plate_size: Scalable integer, the size of the well plate
+    :var plate_size: Larger value corresponds with smaller fontsize, size of well plate is used in the following instances of the function
+    :type plate_size: int
+    :return: float corresponding to a scaled font size 
+    :rtype: float
     """
     return (8 - math.log10(len(str(sizeby)))*2 - math.log10(size)*1.5)
 
@@ -166,7 +168,7 @@ def labelwell(platemap, labelby, iterrange):
     
     :param platemap: Platemap that contains the required labels
     :type platemap: pandas dataframe
-    :param labelby: Dataframe column to label by, insert header name from either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
+    :param labelby: Dataframe column to label by, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
     :type labelby: str
     :param iterrange: Number of instances to itterate over, typically the size of the platemap
     :type iterrange: int
@@ -183,13 +185,13 @@ def wellcolour(platemap, colorby, colormap, iterrange):
     
     :param platemap: Platemap that contains the required labels
     :type platemap: pandas dataframe
-    :param colorby: Dataframe column to colour code, insert header name from either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
+    :param colorby: Dataframe column to colour code, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
     :type colorby: str
-    :param labelby: Dataframe column to label by, insert header name from either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
-    :type labelby: str
     :type colormap: Colour map that generates a customisable list of colours
     :param iterrange: Number of instances to itterate over, typically the size of the platemap
     :type iterrange: int
+    :return: RGB array of a colour that corresponds to a unique label
+    :rtype: numpy array
     """
     # unique strings in the defined column are used as the list of labels, converted to strings to avoid errors.
     types = [str(i) for i in list(platemap[colorby].unique())]
@@ -209,19 +211,19 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
     
     :param platemap: Plate map to plot
     :type platemap: pandas dataframe
-    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384
+    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
     :type size: int    
-    :param export: If 'True' a .png file of the figure is saved, optional
+    :param export: If 'True' a .png file of the figure is saved, default = False
     :type export: bool
     :param title: Sets the title of the figure, optional
     :type title: str
-    :param colormap: Sets the colormap for the color-coding, optional
+    :param colormap: Sets the colormap for the color-coding, default = 'Paired'
     :type colormap: str
-    :param colorby: Chooses the parameter to color code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type colorby: str
-    :param labelby: Chooses the parameter to label code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type labelby: str
-    :param dpi: Size of the figure, optional
+    :param dpi: Size of the figure, default = 150
     :type dpi: int
     :return: Visual representation of the plate map.
     :rtype: figure
@@ -269,7 +271,7 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
             # nan option allows a blank label if there is nothing stipulated for this label condition
             if str(platemap[labelby].iloc[i]) != 'nan':
                 ax.text(0.5, 0.5, labelwell(platemap, labelby, i), 
-                        size = str(fontsize(sizeby = platemap[labelby].iloc[i], size = size)), 
+                        size = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)), 
                         wrap = True, ha = "center", va="center")
     # add title 
     plt.suptitle('{}'.format(title))
@@ -289,19 +291,19 @@ def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False,
     :type y: List of floats or dataframe column
     :param platemap: Plate map to plot
     :type platemap: pandas dataframe
-    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384
+    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
     :type size: int    
-    :param export: If 'True' a .png file of the figure is saved, optional
+    :param export: If 'True' a .png file of the figure is saved, default = False
     :type export: bool
     :param title: Sets the title of the figure, optional
     :type title: str
-    :param colormap: Sets the colormap for the color-coding, optional
+    :param colormap: Sets the colormap for the color-coding, default = 'Dark2_r'
     :type colormap: str
-    :param colorby: Chooses the parameter to color code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type colorby: str
-    :param labelby: Chooses the parameter to label code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type labelby: str
-    :param dpi: Size of the figure, optional
+    :param dpi: Size of the figure, default = 200
     :type dpi: int
     :return: Figure of plotted data for each well of the well plate described in the plate map and the x and y series.
     :rtype: figure
@@ -334,7 +336,7 @@ def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False,
         ax.plot(x.iloc[i], y.iloc[i], lw = 0.5, color = wellcolour(platemap, colorby, colormap, i), 
                 label = labelwell(platemap, labelby, i))
         # add label for each well
-        legend = ax.legend(loc = 'lower center', fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], size = size)),
+        legend = ax.legend(loc = 'lower center', fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)),
                  frameon = False, markerscale = 0)
         
         # remove legend line (keeps only the label text)
@@ -355,13 +357,11 @@ def wellcolour2(platemap, colorby, colormap, itter, to_plot):
     
     :param platemap: Platemap that contains the required labels
     :type platemap: pandas dataframe
-    :param colorby: Dataframe column to colour code, insert header name from either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
+    :param colorby: Dataframe column to colour code, insert header name, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type', default = 'Type'
     :type colorby: str
-    :param labelby: Dataframe column to label by, insert header name from either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'
-    :type labelby: str
     :type colormap: Colour map that generates a customisable list of colours
-    :param iterrange: Number of instances to itterate over, typically the size of the platemap
-    :type iterrange: int
+    :param iter: Number of instances to itterate over, typically the size of the platemap
+    :type iter: int
     :param to_plot: Wells to plot
     :type to_plot: str or list of str
     :return: RGB array of a colour that corresponds to a unique label
@@ -386,15 +386,15 @@ def plot_series(x, y, platemap, to_plot, size = 96, colorby = 'Type', labelby = 
     :type y: List of floats or dataframe column
     :param platemap: Plate map to plot
     :type platemap: pandas dataframe
-    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384
+    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
     :type size: int   
     :param to_plot: Wells to plot
-    :type to_plot: list of strings (well ID's), e.g. "A1", "A2", "A3"
+    :type to_plot: string or list of strings (well ID's), e.g. "A1", "A2", "A3"
     :param colormap: Sets the colormap for the color-coding, optional
     :type colormap: str
-    :param colorby: Chooses the parameter to color code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type colorby: str
-    :param labelby: Chooses the parameter to label code by, choose between 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', optional
+    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
     :type labelby: str
     :return: Plotted data for the stipulated wells of the well plate  
     :rtype: figure
@@ -419,9 +419,9 @@ def invalidate_wells(platemap, wells, valid = False):
     
     :param platemap: Plate map to use
     :type platemap: pandas dataframe
-    :param wells: Wells to invalidate, e.g. ("A1", "B1", "C1")
-    :type wells: list of strings
-    :param valid: Sets the stipulated well 'True' or 'False'
+    :param wells: Well or wells to invalidate, e.g. ("A1", "B1", "C1")
+    :type wells: string or list of strings
+    :param valid: Sets the stipulated well 'True' or 'False', default = False
     :type valid: bool
     :return: Returns updated plate map
     :rtype: pandas dataframe
@@ -435,7 +435,7 @@ def invalidate_rows(platemap, rows, valid = False):
     :type platemap: pandas dataframe
     :param wells: Rows to invalidate, e.g. ("A", "B", "C")
     :type wells: list of strings
-    :param valid: Sets the stipulated rows 'True' or 'False'
+    :param valid: Sets the stipulated row or rows 'True' or 'False', default = False
     :type valid: bool
     :return: Returns updated plate map
     :rtype: pandas dataframe
@@ -450,7 +450,7 @@ def invalidate_cols(platemap, cols, valid = False):
     :type platemap: pandas dataframe
     :param wells: Columns to invalidate, e.g. 1, 2, 3
     :type wells: int or list of ints
-    :param valid: Sets the stipulated columns 'True' or 'False'
+    :param valid: Sets the stipulated column or columns 'True' or 'False', default = False
     :type valid: bool
     :return: Returns updated plate map
     :rtype: pandas dataframe
