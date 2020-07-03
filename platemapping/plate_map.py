@@ -143,7 +143,7 @@ def short_map(file, size = 96, valid = True):
 # The next 3 functions are used to simplify 'visualise' function that follows: 
 
 # hatches are defined to clearly show invalidated wells
-hatchdict = {"True":"", "False":"////"}
+hatchdict = {"True":("", 'black'), "False":("//////", 'red')}
 
 # fontsize will scale font size of visualisaiton to the well plate size (avoids overlapping text)
 def fontsize(sizeby, plate_size): 
@@ -208,7 +208,7 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
              colorby = 'Type', labelby = 'Type', dpi = 150):
     """Returns a visual representation of the plate map.
     
-    The label and colour for each well can be customised to be a variable of either 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'. The size of the plate map used to generate the figure can be either 6, 12, 24, 48, 96 or 384. 
+    The label and colour for each well can be customised to be a variable, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'. The size of the plate map used to generate the figure can be either 6, 12, 24, 48, 96 or 384. 
     
     :param platemap: Plate map to plot
     :type platemap: pandas dataframe
@@ -264,7 +264,8 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
                 
             else:
                 ax.add_artist(plt.Circle((0.5, 0.5), 0.49, facecolor=wellcolour(platemap, colorby, colormap, i), 
-                                          edgecolor='black', lw=0.5, hatch = hatchdict[str(platemap['Valid'].iloc[i])]))
+                                          edgecolor=hatchdict[str(platemap['Valid'].iloc[i])][1], lw=0.5, 
+                                          hatch = hatchdict[str(platemap['Valid'].iloc[i])][0]))
             
             # LABELS
             ax = fig.add_subplot(grid[(ord(platemap['Row'].iloc[i].lower())-96), ((platemap['Column'].iloc[i]))])
@@ -336,6 +337,12 @@ def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False,
         ax.axis('off')
         ax.plot(x.iloc[i], y.iloc[i], lw = 0.5, color = wellcolour(platemap, colorby, colormap, i), 
                 label = labelwell(platemap, labelby, i))
+        
+        if platemap['Valid'].iloc[i] == False:
+            ax.plot([x.iloc[i, 0], x.iloc[i, -1]], [y.iloc[i, 0]-(y.iloc[i, 0]*0.2), y.iloc[i, -1]+(y.iloc[i, -1]*0.05)], color = 'red')
+        
+        
+        
         # add label for each well
         legend = ax.legend(loc = 'lower center', fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)),
                  frameon = False, markerscale = 0)
@@ -377,43 +384,6 @@ def wellcolour2(platemap, colorby, colormap, itter, to_plot):
     colordict['nan'] = 'yellow'
     color = colordict.get(str(platemap[colorby].loc[to_plot[itter]]))
     return color
-
-def plot_series(x, y, platemap, to_plot, size = 96, colorby = 'Type', labelby = 'Type', colormap = 'Dark2_r'):
-    """Returns plotted data from stipulated wells.
-    
-    :param x: Data to be plotted on x axis, length of data must equal length of the platemap
-    :type x: List of floats or dataframe column
-    :param y: Data to be plotted on y axis, length of data must equal length of the platemap
-    :type y: List of floats or dataframe column
-    :param platemap: Plate map to plot
-    :type platemap: pandas dataframe
-    :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
-    :type size: int   
-    :param to_plot: Wells to plot
-    :type to_plot: string or list of strings (well ID's), e.g. "A1", "A2", "A3"
-    :param colormap: Sets the colormap for the color-coding, optional
-    :type colormap: str
-    :param colorby: Chooses the parameter to color code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
-    :type colorby: str
-    :param labelby: Chooses the parameter to label code by, for example 'Type', 'Contents', 'Concentration', 'Compound', 'Protein', 'Concentration Units', default = 'Type'
-    :type labelby: str
-    :return: Plotted data for the stipulated wells of the well plate  
-    :rtype: figure
-    """
-    fig, axs = plt.subplots(len(to_plot), 1, figsize = (2*len(to_plot), 4*len(to_plot)), constrained_layout = True)
-    
-    for i in range(len(to_plot)):
-
-        axs[i].plot(x.loc[to_plot[i]], y.loc[to_plot[i]], lw = 3, 
-                   color = wellcolour2(platemap, colorby, colormap, i, to_plot), 
-                   label = labelwell(platemap, labelby, i))
-        # add label for each well
-        axs[i].legend(loc = 'best', frameon = True, fancybox = True)
-        axs[i].set_title("{} {}".format(to_plot[i], labelwell(platemap, labelby, i)))
-        axs[i].set_facecolor('0.95')
-    
-    title = fig.suptitle('Flex data versus time for the wells {}'.format(', '.join(to_plot)), y = 1.05, size = '20')
-    plt.show()
 
 def invalidate_wells(platemap, wells, valid = False):
     """Returns updated plate map with specified wells invalidated.
@@ -469,4 +439,3 @@ def invalidate_cols(platemap, cols, valid = False):
     ids = [i+str(j) for i, j in zip(delrows, delcols)]
     platemap.loc[ids, 'Valid'] = valid
     return platemap
-
