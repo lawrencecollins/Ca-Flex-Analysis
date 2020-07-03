@@ -64,6 +64,7 @@ def plate_map(file, size = 96, valid = True):
     """Returns a dataframe from a 'long' plate map csv file that defines each and every well from a well plate of defined size
     
     Each defined well in the csv file corresponds to a row of the dataframe. The index is set to the Well ID's of the well plate, e.g. "A1". Dataframe contains headers such as 'Well ID', 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents', 'Type' and 'Valid'. The csv file contains headers on line 2 and a well ID in the first column for every well in the plate.
+    An example csv template can be found here: 'long map example.csv'
     
     :param size: Size of well plate - 6, 12, 24, 48, 96 or 384, default = 96 
     :param type: int
