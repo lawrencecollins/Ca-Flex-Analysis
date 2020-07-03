@@ -159,7 +159,7 @@ def fontsize(sizeby, plate_size):
     :return: float corresponding to a scaled font size 
     :rtype: float
     """
-    return (8 - math.log10(len(str(sizeby)))*2 - math.log10(size)*1.5)
+    return (8 - math.log10(len(str(sizeby)))*2 - math.log10(plate_size)*1.5)
 
 # adds labels according to label stipulations (avoids excessive if statements in the visualise function)
 def labelwell(platemap, labelby, iterrange):
