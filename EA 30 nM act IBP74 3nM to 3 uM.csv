@@ -1,0 +1,10 @@
+Experiment Title:,,14052019 C5sYFP2 IBP21 inhib 300nM to 0.3 nM,,,,,,
+Row,Start,End,Type,Contents,Compound,Protein,Concentration,Concentration Units
+A,1,6,Control,EA+DMSO,,EA [30],,nM
+B,1,6,Compound,EA+IBP74,IBP74,EA [30],3,nM
+C,1,6,Compound,EA+IBP74,IBP74,EA [30],10,nM
+D,1,6,Compound,EA+IBP74,IBP74,EA [30],30,nM
+E,1,6,Compound,EA+IBP74,IBP74,EA [30],100,nM
+ F,1,6,Compound,EA+IBP74,IBP74,EA [30],300,nM
+G,1,6,Compound,EA+IBP74,IBP74,EA [30],1000,nM
+H,1,6,Compound,EA+IBP74,IBP74,EA [30],3000,nM
