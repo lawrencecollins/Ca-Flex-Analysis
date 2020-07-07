@@ -165,7 +165,7 @@ def fontsize(sizeby, plate_size):
 def labelwell(platemap, labelby, iterrange):
     """Returns label for each row of a stipulated column.
     
-    Used to return the appropriate, formatted label from a specified platemap at every well. Empty wells will always return 'empty'. 
+    Used to return the appropriate, formatted label from a specified platemap at every well. Empty wells will always return 'empty', wells without a label will return a blank string.  
     
     :param platemap: Platemap that contains the required labels
     :type platemap: pandas dataframe
@@ -176,8 +176,10 @@ def labelwell(platemap, labelby, iterrange):
     """
     if platemap['Type'].iloc[iterrange] == 'empty':
         return "empty"
-    else:
+    elif str(platemap[labelby].iloc[iterrange]) != 'nan':
         return str(platemap[labelby].iloc[iterrange]).replace(" ", "\n")
+    else:
+        return " "
     
 def wellcolour(platemap, colorby, colormap, iterrange):
     """Returns a unique colour for each label or defined condition.
@@ -284,7 +286,7 @@ def visualise(platemap, title = "", size = 96, export = False, colormap = 'Paire
 
 
         
-def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False, colormap = 'Dark2_r',
+def visualise_all_series(x, y, platemap, share_y, size = 96, title = " ", export = False, colormap = 'Dark2_r',
              colorby = 'Type', labelby = 'Type', dpi = 200):
     """Returns a plot for each series, the location on the grid corresponding to the location of each assay on the well plate.
     :param x: Data to be plotted on x axis, length of data must equal length of the platemap
@@ -293,6 +295,8 @@ def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False,
     :type y: List of floats or dataframe column
     :param platemap: Plate map to plot
     :type platemap: pandas dataframe
+    :param share_y: 'True' sets y axis the same for all plots
+    :type share_y: bool
     :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
     :type size: int    
     :param export: If 'True' a .png file of the figure is saved, default = False
@@ -335,22 +339,24 @@ def visualise_all_series(x, y, platemap, size = 96, title = " ", export = False,
         # color code
         ax = plt.subplot(grid[(ord(platemap['Row'].iloc[i].lower())-96), ((platemap['Column'].iloc[i]))])
         ax.axis('off')
+        # set axes
+        if share_y == True:
+            plt.ylim([y.min().min(), y.max().max()+0.2*y.max().max()])
         ax.plot(x.iloc[i], y.iloc[i], lw = 0.5, color = wellcolour(platemap, colorby, colormap, i), 
                 label = labelwell(platemap, labelby, i))
         
         if platemap['Valid'].iloc[i] == False:
             ax.plot([x.iloc[i, 0], x.iloc[i, -1]], [y.iloc[i, 0]-(y.iloc[i, 0]*0.2), y.iloc[i, -1]+(y.iloc[i, -1]*0.05)], color = 'red')
         
-        
-        
+                
         # add label for each well
-        legend = ax.legend(loc = 'lower center', fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)),
-                 frameon = False, markerscale = 0)
+        legend = ax.legend(fontsize = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)),
+                 frameon = False, markerscale = 0, loc='upper right', bbox_to_anchor=(1.0, 1.0))
         
         # remove legend line (keeps only the label text)
         for item in legend.legendHandles:
             item.set_visible(False)
-    
+
     fig.suptitle('{}'.format(title))
     
     # provides option to save well plate figure 
