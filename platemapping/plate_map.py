@@ -319,7 +319,10 @@ def visualise_all_series(x, y, platemap, share_y, size = 96, title = " ", export
     # define well plate grid according to size of well plate 
     # an extra row and column is added to the grid to house axes labels
     grid = gridspec.GridSpec((wells[size])[0]+1, (wells[size])[1]+1, wspace=0.1, hspace=0.1, figure = fig)
-
+    
+    # calculate y min and y max for share y axis
+    ymin = y.min().min()
+    ymax = y.max().max() + 0.2*y.max().max()
     # plot row labels in extra row
     for i in range(1, (wells[size])[0]+1):
         ax = plt.subplot(grid[i, 0])
@@ -341,7 +344,7 @@ def visualise_all_series(x, y, platemap, share_y, size = 96, title = " ", export
         ax.axis('off')
         # set axes
         if share_y == True:
-            plt.ylim([y.min().min(), y.max().max()+0.2*y.max().max()])
+            plt.ylim([ymin, ymax])
         ax.plot(x.iloc[i], y.iloc[i], lw = 0.5, color = wellcolour(platemap, colorby, colormap, i), 
                 label = labelwell(platemap, labelby, i))
         
