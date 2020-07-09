@@ -202,7 +202,8 @@ class CaFlexAnalysis:
             axs[i].legend(loc = 'best', frameon = True, fancybox = True)
             axs[i].set_title("{} {}".format(to_plot[i], pm.labelwell(self.plate_map, labelby, i)))
             axs[i].set_facecolor('0.95')
-
+            axs[i].set_xlabel("time / s")
+            axs[i].set_ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$")
         title = fig.suptitle('Flex data versus time for the wells {}'.format(', '.join(to_plot)), y = 1.05, size = '20')
         plt.show()
     
