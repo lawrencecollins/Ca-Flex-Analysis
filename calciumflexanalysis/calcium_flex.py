@@ -46,9 +46,7 @@ class CaFlexAnalysis:
         self.size = size
         self.data_type = data_type
         self.valid = valid
-#         self.processed_data = {'ratio':self._data_processed}
-        self.processed_data = self._data_processed()
-
+        self.processed_data = {'ratio':self._data_processed()}
         self.plate_map = self._give_platemap()
         
     def _give_platemap(self):
@@ -119,9 +117,6 @@ class CaFlexAnalysis:
             difference = preprocessed["data1"]['data'].divide(preprocessed["data2"]["data"])
             return {'time':mean_time, 'data':difference}
             
-            
-            
-    
     def visualise_assay(self, share_y, export = False, title = "", colormap = 'Dark2_r',
              colorby = 'Type', labelby = 'Type', dpi = 200):
         """Returns color-coded and labelled plots of the data collected for each well of the well plate.
@@ -145,7 +140,7 @@ class CaFlexAnalysis:
         """
         CaFlexAnalysis.title = title
         
-        pm.visualise_all_series(x = self.processed_data['time'], y = self.processed_data['data'], 
+        pm.visualise_all_series(x = self.processed_data['ratio']['time'], y = self.processed_data['ratio']['data'], 
                             share_y = share_y, platemap = self.plate_map, size = self.size, 
                             export = export, colormap = colormap,
                             colorby = colorby, labelby = labelby, 
@@ -157,7 +152,6 @@ class CaFlexAnalysis:
         """Returns a visual representation of the plate map.
     
         The label and colour for each well can be customised to be a variable, for example 'Compound', 'Protein', 'Concentration', 'Concentration Units', 'Contents' or 'Type'. The size of the plate map used to generate the figure can be either 6, 12, 24, 48, 96 or 384. 
-
         :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
         :type size: int    
         :param export: If 'True' a .png file of the figure is saved, default = False
@@ -181,7 +175,6 @@ class CaFlexAnalysis:
        
     def see_wells(self, to_plot, share_y = True, size = 96, colorby = 'Type', labelby = 'Type', colormap = 'Dark2_r'):
         """Returns plotted data from stipulated wells.
-
         :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
         :type size: int   
         :param to_plot: Wells to plot
@@ -201,7 +194,7 @@ class CaFlexAnalysis:
 
         for i in range(len(to_plot)):
 
-            axs[i].plot(self.processed_data['time'].loc[to_plot[i]], self.processed_data['data'].loc[to_plot[i]], 
+            axs[i].plot(self.processed_data['ratio']['time'].loc[to_plot[i]], self.processed_data['ratio']['data'].loc[to_plot[i]], 
                         lw = 3, color = pm.wellcolour2(self.plate_map, colorby, colormap, i, to_plot), 
                        label = pm.labelwell(self.plate_map, labelby, i))
            
