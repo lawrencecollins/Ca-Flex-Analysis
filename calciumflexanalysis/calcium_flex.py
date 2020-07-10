@@ -48,6 +48,8 @@ class CaFlexAnalysis:
         self.valid = valid
         self.processed_data = {'ratio':self._data_processed()}
         self.plate_map = self._give_platemap()
+        self.processed_data['baseline_corrected'] = self._baseline_correct()
+        self.plateau = self._find_plateau()
         
     def _give_platemap(self):
         """Returns platemap dataframe."""
@@ -175,6 +177,7 @@ class CaFlexAnalysis:
        
     def see_wells(self, to_plot, share_y = True, size = 96, colorby = 'Type', labelby = 'Type', colormap = 'Dark2_r'):
         """Returns plotted data from stipulated wells.
+        
         :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
         :type size: int   
         :param to_plot: Wells to plot
@@ -208,7 +211,7 @@ class CaFlexAnalysis:
         plt.show()
     
     def invalidate_wells(self, wells):
-        """Invalidates specified wells and updates plate_map
+        """Invalidates specified wells and updates plate_map.
         
         :param wells: Wells to invalidate
         :type wells: list of strings, e.g. ("A1", "A2", "A3")
@@ -218,7 +221,7 @@ class CaFlexAnalysis:
         
         
     def invalidate_rows(self, rows):
-        """Invalidates specified rows and updates plate_map
+        """Invalidates specified rows and updates plate_map.
         
         :param wells: Rows to invalidate
         :type wells: list of strings, e.g. ("A", "B", "C")
@@ -228,10 +231,113 @@ class CaFlexAnalysis:
     
     
     def invalidate_cols(self, cols):
-        """Invalidates specified wells and updates plate_map
+        """Invalidates specified wells and updates plate_map.
         
         :param wells: Wells to invalidate
         :type wells: list of ints, e.g. (1, 2, 3)
         """
         platemap = pm.invalidate_cols(self.plate_map, cols, valid = False)
         self.plate_map = platemap
+        
+        
+    def _baseline_correct(self): 
+        """Baseline correction to pre-injection data."""
+        inject = 60 # ADD INJECT TO INITIATION
+        time_cut = inject - 5
+        data_source = self.processed_data['ratio']
+        #convert to numpy arrays
+        time = data_source['time'].to_numpy()
+        data = data_source['data'].to_numpy()
+        # create mask from mean time values
+        time_filter = np.nanmean(time, axis = 0) < time_cut
+        # average over these times
+        baseline = np.mean(data[:, time_filter], axis = 1)
+        # add dimenstion to enable broadcasting
+        baseline = np.expand_dims(baseline, axis = 1)
+        #rewrite values back to dataframes
+        self.processed_data['baseline_corrected'] = {}
+        data = pd.DataFrame(data-baseline, index = data_source['time'].index)
+        time =  self.processed_data['ratio']['time']
+        
+        return {'time':time, 'data':data}
+        
+        
+        
+    def plot_conditions(self, data_type, show_plateau = False):
+        """Plot mean of each condition with standard error bars. 
+        
+        :param data_type: Data type to plot, either 'ratio' or 'baseline_corrected'
+        :type data_type: str
+        :param show_plateau: Adds axvspan corresponding to flattest mean gradient over 10 time points post injection
+        :type show_plateau: bool
+        :return: Plotted mean data for each condition
+        :rtype: fig
+        """
+        platemap = self.plate_map
+        grouplist = ['Protein','Type', 'Compound','Concentration']
+        groupdct = {}
+        
+        for key, val in self.processed_data[data_type].items():
+            # join time and data to plate map 
+            mapped = platemap.join(val)
+            # group by protein, type, compound and concentration
+            group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
+            # update dict
+            groupdct[key] = group
+            
+        # plot series for each mean condition and control
+        for i in range(len(groupdct['time'].mean())):
+            plt.errorbar(groupdct['time'].mean().iloc[i], groupdct['data'].mean().iloc[i], yerr=groupdct['data'].sem().iloc[i], capsize = 3, label = "{}, {}".format(list(groupdct['data'].mean().index.get_level_values('Concentration'))[i], list(groupdct['data'].mean().index.get_level_values('Compound'))[i]))
+            
+            # add labels
+        plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
+        plt.xlabel("time / s")
+        plt.ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$") # UPDATE LABELS 
+        
+        # axvspan
+        if show_plateau == True:
+            # x min and x max for axvspan 
+            xmin = self.processed_data[data_type]['time'].loc[:, self.plateau[0]].mean()
+            xmax = self.processed_data[data_type]['time'].loc[:, self.plateau[1]].mean()
+            plt.axvspan(xmin, xmax, facecolor = 'pink', alpha = 0.5)
+
+        plt.show()
+                
+    def _find_plateau(self, data_type = 'baseline_corrected'):
+        """Finds the time points corresponding to the average gradient that is closest to 0, between 10 time points.
+        
+        :param data_type: Data type to plot, either 'ratio' or 'baseline_corrected', default = 'baseline_corrected'
+        :type data_type: str
+        """
+        # Filter for valid wells
+        valid_filter = self.plate_map.Valid == True
+        
+        # add opposite time filter to extract data after injection
+        inject = 60 # ADD INJECT TO INITIATION
+        time_cut = inject - 5 
+        data_source = self.processed_data[data_type]
+        # convert to numpy arrays
+        time = data_source['time'][valid_filter].to_numpy()
+        data = data_source['data'][valid_filter].to_numpy()
+        # create mask from mean time values
+        post_inject_filter = np.nanmean(time,axis=0) > time_cut
+        
+        # get absolute gradient for each well along series
+        gradient = abs(np.gradient(data[:,post_inject_filter], axis = 1))
+
+        gradient_dict = {}
+
+        # mean gradient every ten measurements
+        for i in range(gradient.shape[1]-10):
+
+            # average of average gradients for every ten measurements post injection
+            mean_gradient = np.nanmean(np.mean(gradient[:, i:(i+10)], axis=1), axis = 0)
+            gradient_dict[(i), (i+10)] = mean_gradient
+
+        # get minimum gradient index window
+        min_gradient = (min(gradient_dict, key = gradient_dict.get))
+        
+        amp = (self.processed_data['baseline_corrected']['data'].iloc[:, min_gradient[0]:min_gradient[1]]).to_numpy()
+        amp_mean = np.mean(amp, axis = 1)
+        return min_gradient
+        
