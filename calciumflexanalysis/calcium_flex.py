@@ -326,13 +326,16 @@ class CaFlexAnalysis:
         gradient = abs(np.gradient(data[:,post_inject_filter], axis = 1))
 
         gradient_dict = {}
+        index = np.array(list(data_source['data'].columns))[post_inject_filter]
+
+        
 
         # mean gradient every ten measurements
         for i in range(gradient.shape[1]-10):
 
             # average of average gradients for every ten measurements post injection
             mean_gradient = np.nanmean(np.mean(gradient[:, i:(i+10)], axis=1), axis = 0)
-            gradient_dict[(i), (i+10)] = mean_gradient
+            gradient_dict[(index[i]), (index[i]+10)] = mean_gradient
 
         # get minimum gradient index window
         min_gradient = (min(gradient_dict, key = gradient_dict.get))
