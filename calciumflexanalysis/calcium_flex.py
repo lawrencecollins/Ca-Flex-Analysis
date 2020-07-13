@@ -310,13 +310,13 @@ class CaFlexAnalysis:
         :return: Tuple of start and end index of plateau window
         :rtype: tuple of ints
         """
-        valid_filter = plate3.plate_map.Valid == True
+        valid_filter = self.plate_map.Valid == True
         data_source = self.processed_data[data_type]
         time_df = data_source['time'][valid_filter]
         # create mask from mean time values
-        window_filter = np.nanmean(time_df,axis=0) > time
+        window_filter = np.nanmean(time_df,axis=0) >= time
         index = np.array(list(data_source['data'].columns))[window_filter]
-        return (index[0], index[10])
+        self.window =  (index[0], index[10])
     
     
     def plot_conditions(self, data_type, show_window = False):
