@@ -48,8 +48,6 @@ class CaFlexAnalysis:
         self.valid = valid
         self.processed_data = {'ratio':self._data_processed()}
         self.plate_map = self._give_platemap()
-        self.processed_data['baseline_corrected'] = self._baseline_correct()
-        self.plateau = self._find_plateau()
         
     def _give_platemap(self):
         """Returns platemap dataframe."""
@@ -177,7 +175,6 @@ class CaFlexAnalysis:
        
     def see_wells(self, to_plot, share_y = True, size = 96, colorby = 'Type', labelby = 'Type', colormap = 'Dark2_r'):
         """Returns plotted data from stipulated wells.
-        
         :param size: Size of platemap, 6, 12, 24, 48, 96 or 384, default = 96
         :type size: int   
         :param to_plot: Wells to plot
@@ -211,7 +208,7 @@ class CaFlexAnalysis:
         plt.show()
     
     def invalidate_wells(self, wells):
-        """Invalidates specified wells and updates plate_map.
+        """Invalidates specified wells and updates plate_map
         
         :param wells: Wells to invalidate
         :type wells: list of strings, e.g. ("A1", "A2", "A3")
@@ -221,7 +218,7 @@ class CaFlexAnalysis:
         
         
     def invalidate_rows(self, rows):
-        """Invalidates specified rows and updates plate_map.
+        """Invalidates specified rows and updates plate_map
         
         :param wells: Rows to invalidate
         :type wells: list of strings, e.g. ("A", "B", "C")
@@ -231,7 +228,7 @@ class CaFlexAnalysis:
     
     
     def invalidate_cols(self, cols):
-        """Invalidates specified wells and updates plate_map.
+        """Invalidates specified wells and updates plate_map
         
         :param wells: Wells to invalidate
         :type wells: list of ints, e.g. (1, 2, 3)
@@ -240,98 +237,56 @@ class CaFlexAnalysis:
         self.plate_map = platemap
         
         
-    def _baseline_correct(self): 
-        """Baseline correction to pre-injection data."""
-        inject = 60 # ADD INJECT TO INITIATION
+    def baseline_correct(self):
+        """Baseline corrects 'ratio' data using the pre-injection time points."""
+        inject = 60 # DEFINE INJECT IN CLASS
         time_cut = inject - 5
         data_source = self.processed_data['ratio']
-        #convert to numpy arrays
+        # convert to numpy arrays
         time = data_source['time'].to_numpy()
         data = data_source['data'].to_numpy()
         # create mask from mean time values
-        time_filter = np.nanmean(time, axis = 0) < time_cut
-        # average over these times
-        baseline = np.mean(data[:, time_filter], axis = 1)
-        # add dimenstion to enable broadcasting
-        baseline = np.expand_dims(baseline, axis = 1)
-        #rewrite values back to dataframes
+        time_filter = np.nanmean(time,axis=0)<time_cut
+        # # average over these times
+        baseline = np.mean(data[:,time_filter],axis=1)
+        # add dimension to enable broadcasting
+        baseline = np.expand_dims(baseline, axis=1)
+        # rewrite values back to dataframes
         self.processed_data['baseline_corrected'] = {}
-        data = pd.DataFrame(data-baseline, index = data_source['time'].index)
-        time =  self.processed_data['ratio']['time']
-        
-        return {'time':time, 'data':data}
+        data_source = self.processed_data['baseline_corrected']['data'] = pd.DataFrame(data-baseline, index = data_source['data'].index)
+        data_source = self.processed_data['baseline_corrected']['time'] = data_source = self.processed_data['ratio']['time']
         
         
+    def get_window(self, data_type):
+        """Returns the 10 time points post injection that contain the flattest average gradient.
         
-    def plot_conditions(self, data_type, show_plateau = False):
-        """Plot mean of each condition with standard error bars. 
-        
-        :param data_type: Data type to plot, either 'ratio' or 'baseline_corrected'
-        :type data_type: str
-        :param show_plateau: Adds axvspan corresponding to flattest mean gradient over 10 time points post injection
-        :type show_plateau: bool
-        :return: Plotted mean data for each condition
-        :rtype: fig
-        """
-        platemap = self.plate_map
-        grouplist = ['Protein','Type', 'Compound','Concentration']
-        groupdct = {}
-        
-        for key, val in self.processed_data[data_type].items():
-            # join time and data to plate map 
-            mapped = platemap.join(val)
-            # group by protein, type, compound and concentration
-            group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
-            # update dict
-            groupdct[key] = group
-            
-        # plot series for each mean condition and control
-        for i in range(len(groupdct['time'].mean())):
-            plt.errorbar(groupdct['time'].mean().iloc[i], groupdct['data'].mean().iloc[i], yerr=groupdct['data'].sem().iloc[i], capsize = 3, label = "{}, {}".format(list(groupdct['data'].mean().index.get_level_values('Concentration'))[i], list(groupdct['data'].mean().index.get_level_values('Compound'))[i]))
-            
-            # add labels
-        plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
-        plt.xlabel("time / s")
-        plt.ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$") # UPDATE LABELS 
-        
-        # axvspan
-        if show_plateau == True:
-            # x min and x max for axvspan 
-            xmin = self.processed_data[data_type]['time'].loc[:, self.plateau[0]].mean()
-            xmax = self.processed_data[data_type]['time'].loc[:, self.plateau[1]].mean()
-            plt.axvspan(xmin, xmax, facecolor = 'pink', alpha = 0.5)
-
-        plt.show()
-                
-    def _find_plateau(self, data_type = 'baseline_corrected'):
-        """Finds the time points corresponding to the average gradient that is closest to 0, between 10 time points.
-        
-        :param data_type: Data type to plot, either 'ratio' or 'baseline_corrected', default = 'baseline_corrected'
+        :param data_type: Data series to calculate plateau
         :type data_type: str
         """
-        # Filter for valid wells
+        # calculate both baseline and ratio??
+        
+        # filter for valid wells
         valid_filter = self.plate_map.Valid == True
-        
+
         # add opposite time filter to extract data after injection
-        inject = 60 # ADD INJECT TO INITIATION
-        time_cut = inject - 5 
+        time_cut = 55
         data_source = self.processed_data[data_type]
+
         # convert to numpy arrays
         time = data_source['time'][valid_filter].to_numpy()
         data = data_source['data'][valid_filter].to_numpy()
         # create mask from mean time values
         post_inject_filter = np.nanmean(time,axis=0) > time_cut
-        
+
         # get absolute gradient for each well along series
-        gradient = abs(np.gradient(data[:,post_inject_filter], axis = 1))
+        gradient = abs(np.gradient(data[:, post_inject_filter], axis = 1))
 
         gradient_dict = {}
+
         index = np.array(list(data_source['data'].columns))[post_inject_filter]
 
-        
-
         # mean gradient every ten measurements
-        for i in range(gradient.shape[1]-10):
+        for i in range(gradient.shape[1]-9):
 
             # average of average gradients for every ten measurements post injection
             mean_gradient = np.nanmean(np.mean(gradient[:, i:(i+10)], axis=1), axis = 0)
@@ -339,8 +294,91 @@ class CaFlexAnalysis:
 
         # get minimum gradient index window
         min_gradient = (min(gradient_dict, key = gradient_dict.get))
+
+
+
+        self.window = min_gradient
+        # return tuple???
         
-        amp = (self.processed_data['baseline_corrected']['data'].iloc[:, min_gradient[0]:min_gradient[1]]).to_numpy()
+    def def_window(self, time):
+        pass
+    
+    
+    def plot_conditions(self, data_type, show_window = False):
+        """Plots each mean condition versus time.
+        
+        'show_window' uses axvspan to visualise what section of the series is being used to calculate amplitudes. This can be defined using 'get_window' (automatically calculates flattest gradient), or 'def_window' (allows the user to manually input the time point of the plateau).
+        
+        :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
+        :type data_type: str
+        :param show_plateau: If 'True', shows the location of the plateau on the series, default = False 
+        :type show_plateau: bool
+        :return: Figure displaying each mean condition versus time
+        :rtype: fig
+        """
+        platemap = self.plate_map
+        grouplist = ['Protein','Type', 'Compound','Concentration']
+
+        groupdct = {}
+        for key, val in self.processed_data['baseline_corrected'].items():
+            mapped = platemap.join(val)
+            group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
+            # update dictionary
+            groupdct[key] = group
+
+        # plot series for each condition and control
+        for i in range(len(groupdct['time'].mean())):
+            plt.errorbar(groupdct['time'].mean().iloc[i], groupdct['data'].mean().iloc[i], yerr=groupdct['data'].sem().iloc[i], 
+                         capsize = 3, 
+                         label = "{}, {}".format(list(groupdct['data'].mean().index.get_level_values('Concentration'))[i], 
+                                                list(groupdct['data'].mean().index.get_level_values('Compound'))[i])) 
+            # add label function that concatenates conc w/ the correct units 
+        plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
+        plt.xlabel("time / s")
+        plt.ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$")
+
+        if show_window == True:
+            # x min and x max for axvspan 
+            xmin = self.processed_data['baseline_corrected']['time'].loc[:, self.window[0]].mean()
+            xmax = self.processed_data['baseline_corrected']['time'].loc[:, self.window[1]].mean()
+            plt.axvspan(xmin, xmax, facecolor = 'red', alpha = 0.5)
+        
+        plt.show()
+        
+    def amplitude(self, data_type):
+        """Calculates response amplitude for each condition, updates processed_data dictionary with 'plateau' and plate_map with amplitude column. 
+        
+        :param data_type: Data to use to calculate amplitudes, either 'ratio' or 'baseline_corrected'
+        :type data_type: str
+
+        """
+        # get ampltitude for every condition
+        amp = (self.processed_data[data_type]['data'].iloc[:, self.window[0]:self.window[1]]).to_numpy()
+        # get mean amplitude for every condition
         amp_mean = np.mean(amp, axis = 1)
-        return min_gradient
+        # update processed_data with response amplitude
+        self.processed_data['plateau'] = {}
+        self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
+        self.processed_data['plateau']['time'] = self.processed_data['ratio']['time']
+        
+        
+        # update plate map
+        self.plate_map = self.plate_map.join(self.processed_data['plateau']['data'])
+        
+    def mean_amplitude(self):
+        """Returns mean amplitudes for each condition.
+        
+        :return: Mean amplitudes for each condition
+        :rtype: Pandas DataFrame
+        """
+        # group by grouplist and take mean amplitude for each condition
+        grouplist = ['Protein','Type', 'Compound','Concentration']
+        # filter for valid wells
+        group = self.plate_map[self.plate_map.Valid == True] 
+        # drop columns which can cause errors w/ groupby operations
+        group.drop(['Valid', 'Column'], axis = 1, inplace = True)
+        mean_response_amp = group.groupby(grouplist).mean()
+        return mean_response_amp
+    
+    
         
