@@ -12,84 +12,84 @@ A9,,,,,,
 A10,,,,,,
 A11,,,,,,
 A12,,,,,,
-B1,Assay control,EA+DMSO,,EA,,
-B2,Assay control,EA+DMSO,,EA,,
-B3,Assay control,EA+DMSO,,EA,,
-B4,Assay control,EA+DMSO,,EA,,
-B5,Assay control,EA+DMSO,,EA,,
-B6,Assay control,EA+DMSO,,EA,,
+B1,Assay control,EA+DMSO,EA,TRPC5,,
+B2,Assay control,EA+DMSO,EA,TRPC5,,
+B3,Assay control,EA+DMSO,EA,TRPC5,,
+B4,Assay control,EA+DMSO,EA,TRPC5,,
+B5,Assay control,EA+DMSO,EA,TRPC5,,
+B6,Assay control,EA+DMSO,EA,TRPC5,,
 B7,,,,,,
 B8,,,,,,
 B9,,,,,,
 B10,,,,,,
 B11,,,,,,
 B12,,,,,,
-C1,Compound,EA+IBP21,IB21,EA,300,nM
-C2,Compound,EA+IBP22,IB21,EA,300,nM
-C3,Compound,EA+IBP23,IB21,EA,300,nM
-C4,Compound,EA+IBP24,IB21,EA,300,nM
-C5,Compound,EA+IBP25,IB21,EA,300,nM
-C6,Compound,EA+IBP26,IB21,EA,300,nM
+C1,Compound,EA+IBP21,IB21,TRPC5,300,nM
+C2,Compound,EA+IBP22,IB21,TRPC5,300,nM
+C3,Compound,EA+IBP23,IB21,TRPC5,300,nM
+C4,Compound,EA+IBP24,IB21,TRPC5,300,nM
+C5,Compound,EA+IBP25,IB21,TRPC5,300,nM
+C6,Compound,EA+IBP26,IB21,TRPC5,300,nM
 C7,,,,,,
 C8,,,,,,
 C9,,,,,,
 C10,,,,,,
 C11,,,,,,
 C12,,,,,,
-D1,Compound,EA+IBP21,IB21,EA,100,nM
-D2,Compound,EA+IBP22,IB21,EA,100,nM
-D3,Compound,EA+IBP23,IB21,EA,100,nM
-D4,Compound,EA+IBP24,IB21,EA,100,nM
-D5,Compound,EA+IBP25,IB21,EA,100,nM
-D6,Compound,EA+IBP26,IB21,EA,100,nM
+D1,Compound,EA+IBP21,IB21,TRPC5,100,nM
+D2,Compound,EA+IBP22,IB21,TRPC5,100,nM
+D3,Compound,EA+IBP23,IB21,TRPC5,100,nM
+D4,Compound,EA+IBP24,IB21,TRPC5,100,nM
+D5,Compound,EA+IBP25,IB21,TRPC5,100,nM
+D6,Compound,EA+IBP26,IB21,TRPC5,100,nM
 D7,,,,,,
 D8,,,,,,
 D9,,,,,,
 D10,,,,,,
 D11,,,,,,
 D12,,,,,,
-E1,Compound,EA+IBP21,IB21,EA,30,nM
-E2,Compound,EA+IBP22,IB21,EA,30,nM
-E3,Compound,EA+IBP23,IB21,EA,30,nM
-E4,Compound,EA+IBP24,IB21,EA,30,nM
-E5,Compound,EA+IBP25,IB21,EA,30,nM
-E6,Compound,EA+IBP26,IB21,EA,30,nM
+E1,Compound,EA+IBP21,IB21,TRPC5,30,nM
+E2,Compound,EA+IBP22,IB21,TRPC5,30,nM
+E3,Compound,EA+IBP23,IB21,TRPC5,30,nM
+E4,Compound,EA+IBP24,IB21,TRPC5,30,nM
+E5,Compound,EA+IBP25,IB21,TRPC5,30,nM
+E6,Compound,EA+IBP26,IB21,TRPC5,30,nM
 E7,,,,,,
 E8,,,,,,
 E9,,,,,,
 E10,,,,,,
 E11,,,,,,
 E12,,,,,,
-F1,Compound,EA+IBP21,IB21,EA,10,nM
-F2,Compound,EA+IBP22,IB21,EA,10,nM
-F3,Compound,EA+IBP23,IB21,EA,10,nM
-F4,Compound,EA+IBP24,IB21,EA,10,nM
-F5,Compound,EA+IBP25,IB21,EA,10,nM
-F6,Compound,EA+IBP26,IB21,EA,10,nM
+F1,Compound,EA+IBP21,IB21,TRPC5,10,nM
+F2,Compound,EA+IBP22,IB21,TRPC5,10,nM
+F3,Compound,EA+IBP23,IB21,TRPC5,10,nM
+F4,Compound,EA+IBP24,IB21,TRPC5,10,nM
+F5,Compound,EA+IBP25,IB21,TRPC5,10,nM
+F6,Compound,EA+IBP26,IB21,TRPC5,10,nM
 F7,,,,,,
 F8,,,,,,
 F9,,,,,,
 F10,,,,,,
 F11,,,,,,
 F12,,,,,,
-G1,Compound,EA+IBP21,IB21,EA,3,nM
-G2,Compound,EA+IBP22,IB21,EA,3,nM
-G3,Compound,EA+IBP23,IB21,EA,3,nM
-G4,Compound,EA+IBP24,IB21,EA,3,nM
-G5,Compound,EA+IBP25,IB21,EA,3,nM
-G6,Compound,EA+IBP26,IB21,EA,3,nM
+G1,Compound,EA+IBP21,IB21,TRPC5,3,nM
+G2,Compound,EA+IBP22,IB21,TRPC5,3,nM
+G3,Compound,EA+IBP23,IB21,TRPC5,3,nM
+G4,Compound,EA+IBP24,IB21,TRPC5,3,nM
+G5,Compound,EA+IBP25,IB21,TRPC5,3,nM
+G6,Compound,EA+IBP26,IB21,TRPC5,3,nM
 G7,,,,,,
 G8,,,,,,
 G9,,,,,,
 G10,,,,,,
 G11,,,,,,
 G12,,,,,,
-H1,Compound,EA+IBP21,IB21,EA,1,nM
-H2,Compound,EA+IBP22,IB21,EA,1,nM
-H3,Compound,EA+IBP23,IB21,EA,1,nM
-H4,Compound,EA+IBP24,IB21,EA,1,nM
-H5,Compound,EA+IBP25,IB21,EA,1,nM
-H6,Compound,EA+IBP26,IB21,EA,1,nM
+H1,Compound,EA+IBP21,IB21,TRPC5,1,nM
+H2,Compound,EA+IBP22,IB21,TRPC5,1,nM
+H3,Compound,EA+IBP23,IB21,TRPC5,1,nM
+H4,Compound,EA+IBP24,IB21,TRPC5,1,nM
+H5,Compound,EA+IBP25,IB21,TRPC5,1,nM
+H6,Compound,EA+IBP26,IB21,TRPC5,1,nM
 H7,,,,,,
 H8,,,,,,
 H9,,,,,,
