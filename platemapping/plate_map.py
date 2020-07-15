@@ -78,6 +78,10 @@ def plate_map(file, size = 96, valid = True):
     # set index to Well ID
     df = df.set_index(df['Well ID'])
     
+        # check there are no repeats
+    if len(df.index) != size:
+        raise ValueError("Check your plate map! Incorrect number of wells.")
+    
     # correct typos due to capitalisation and trailing spaces
     df['Type'] = df['Type'].str.lower()
     df[['Contents', 'Compound', 'Protein', 'Type']] = df[['Contents', 'Compound', 
@@ -126,6 +130,12 @@ def short_map(file, size = 96, valid = True):
         temp.set_index('ID', inplace = True)
         # add generated rows to new dataframe
         filleddf = filleddf.append(temp)
+        
+        # check there are no repeats
+        if filleddf.shape[0] != size:
+            raise ValueError("Incorrect number of wells!")
+        if len(filleddf.index) != size:
+            raise ValueError("Check your plate map! Incorrect number of wells.")
     
     # insert filled df into empty plate map to include empty rows 
     finalmap = empty_map(size = size, valid = valid)
@@ -137,7 +147,6 @@ def short_map(file, size = 96, valid = True):
     finalmap[['Contents', 'Compound', 'Protein', 'Type']] = finalmap[['Contents', 'Compound', 
                                                                       'Protein', 'Type']].stack().str.rstrip().unstack()
 
-    
     return finalmap
 
 # The next 3 functions are used to simplify 'visualise' function that follows: 
