@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import string, math
 from platemapping import plate_map as pm
+import matplotlib.patches as mpl_patches
+from scipy.optimize import curve_fit
 
 wells = {6:(2, 3), 12:(3, 4), 24:(4, 6), 48:(6, 8), 96:(8, 12), 384:(16, 24)} 
 
@@ -17,6 +19,25 @@ def read_in_new(raw_data):
     df = pd.read_csv(raw_data, delimiter='\t', skiprows = 2, skipfooter=3, engine = 'python', encoding = "utf-16", 
                     skip_blank_lines=True) 
     return df
+
+# curve fitting functions
+# ec50 function
+def _ec50_func(x,top,bottom, ec50, hill):
+    z=(ec50/x)**hill
+    return (bottom + ((top-bottom)/(1+z)))   
+
+# ic50 function
+def _ic50_func(x,top,bottom, ic50, hill):
+    z=(ic50/x)**hill
+    return (top - ((top-bottom)/(1+z)))
+
+# c50 dictionary for accessing functions
+func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
+
+
+
+
+
 
 class CaFlexAnalysis:
     """Class used for the analysis of Calcium Flex assays.
@@ -38,7 +59,6 @@ class CaFlexAnalysis:
     :param plate_map: plate_map_file converted as a dataframe
     :type plate_map: pandas dataframe
     """
-    
     def __init__(self, raw_data, plate_map_file, map_type = 'short', data_type = 'old', valid = True, size = 96):
         self.raw_data = raw_data
         self.plate_map_file = plate_map_file
@@ -48,6 +68,7 @@ class CaFlexAnalysis:
         self.valid = valid
         self.processed_data = {'ratio':self._data_processed()}
         self.plate_map = self._give_platemap()
+        self.grouplist = ['Protein','Type', 'Compound','Concentration', 'Concentration Units']
         
     def _give_platemap(self):
         """Returns platemap dataframe."""
@@ -203,7 +224,7 @@ class CaFlexAnalysis:
             axs[i].set_title("{} {}".format(to_plot[i], pm.labelwell(self.plate_map, labelby, i)))
             axs[i].set_facecolor('0.95')
             axs[i].set_xlabel("time / s")
-            axs[i].set_ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$")
+            axs[i].set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
         title = fig.suptitle('Flex data versus time for the wells {}'.format(', '.join(to_plot)), y = 1.05, size = '20')
         plt.show()
     
@@ -319,7 +340,7 @@ class CaFlexAnalysis:
         self.window =  (index[0], index[10])
     
     
-    def plot_conditions(self, data_type, show_window = False):
+    def plot_conditions(self, data_type, show_window = False, dpi = 120):
         """Plots each mean condition versus time.
         
         'show_window' uses axvspan to visualise what section of the series is being used to calculate amplitudes. This can be defined using 'get_window' (automatically calculates flattest gradient), or 'def_window' (allows the user to manually input the time point of the plateau).
@@ -328,16 +349,17 @@ class CaFlexAnalysis:
         :type data_type: str
         :param show_plateau: If 'True', shows the location of the plateau on the series, default = False 
         :type show_plateau: bool
+        :param dpi: Size of figure
+        :type dpi: int
         :return: Figure displaying each mean condition versus time
         :rtype: fig
         """
         platemap = self.plate_map
-        grouplist = ['Protein','Type', 'Compound','Concentration']
-
+        plt.figure(dpi = dpi)
         groupdct = {}
         for key, val in self.processed_data['baseline_corrected'].items():
             mapped = platemap.join(val)
-            group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
+            group = mapped[mapped.Valid == True].groupby(self.grouplist)[val.columns]
             # update dictionary
             groupdct[key] = group
 
@@ -350,13 +372,13 @@ class CaFlexAnalysis:
             # add label function that concatenates conc w/ the correct units 
         plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
         plt.xlabel("time / s")
-        plt.ylabel("$\mathrm{Ca^{2+} \Delta F(340/380)}$")
+        plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
 
         if show_window == True:
             # x min and x max for axvspan 
             xmin = self.processed_data['baseline_corrected']['time'].loc[:, self.window[0]].mean()
             xmax = self.processed_data['baseline_corrected']['time'].loc[:, self.window[1]].mean()
-            plt.axvspan(xmin, xmax, facecolor = 'red', alpha = 0.5)
+            plt.axvspan(xmin, xmax, facecolor = 'hotpink', alpha = 0.5)
         
         plt.show()
         
@@ -374,26 +396,114 @@ class CaFlexAnalysis:
         # update processed_data with response amplitude
         self.processed_data['plateau'] = {}
         self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
-        self.processed_data['plateau']['time'] = self.processed_data['ratio']['time']
         
-        
-        # update plate map
-        self.plate_map = self.plate_map.join(self.processed_data['plateau']['data'])
         
     def mean_amplitude(self):
-        """Returns mean amplitudes for each condition.
+        """Returns mean amplitudes and error for each condition.
         
-        :return: Mean amplitudes for each condition
+        :return: Mean amplitudes and error for each condition
         :rtype: Pandas DataFrame
         """
+        
+        mapped = self.plate_map.fillna(-1).join(self.processed_data['plateau']['data'])
         # group by grouplist and take mean amplitude for each condition
-        grouplist = ['Protein','Type', 'Compound','Concentration']
         # filter for valid wells
-        group = self.plate_map[self.plate_map.Valid == True] 
+        group = mapped[mapped.Valid == True] 
         # drop columns which can cause errors w/ groupby operations
         group.drop(['Valid', 'Column'], axis = 1, inplace = True)
-        mean_response_amp = group.groupby(grouplist).mean()
-        return mean_response_amp
-    
-    
+        mean_response = group.groupby(self.grouplist).mean().reset_index()
+        mean_response['Error'] = group.groupby(self.grouplist).sem().reset_index()['Amplitude']
+        return mean_response
+ 
+
+    # logistic fit
+    def _logistic_fit(self, plot_func, type_to_plot = 'compound', **kwargs):
+        """Generates logistic fit for ic50/ec50 plot from mean amplitudes.
         
+        :param plot_func: Plot function to use, either ic50 or ec50
+        :type plot_func: str
+        :param type_to_plot: Type of condition to plot, default = 'compound'
+        :type type_to_plot: str
+        :return: array containing 'top', 'bottom', plot_func ('ec50' or 'ic50') and 'hill'
+        :rtype: numpy array
+        """
+        # get data
+        table = self.mean_amplitude()
+        amps = table[table['Type'] == type_to_plot] 
+        x = amps['Concentration']
+        y = amps['Amplitude']
+        
+        # generate top, bottom, plot_func and hill values
+        popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs)
+        return popt
+    
+    def plot_curve(self, plot_func, type_to_plot = 'compound', title = 'auto', dpi = 120, **kwargs):
+        """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
+        
+        :param plot_func: Plot function to use, either ic50 or ec50
+        :type plot_func: str
+        :param type_to_plot: Type of condition to plot, default = 'compound'
+        :type type_to_plot: str
+        :param title: Choose between automatic title or insert string to use, default = 'auto'
+        :type title: str
+        :param dpi: Size of figure
+        :type dpi: int
+        :return: Figure with fitted dose-response curve
+        :rtype: fig
+        
+        """
+        # get popt values for logistic regression
+        popt = self._logistic_fit(plot_func, type_to_plot, **kwargs)
+        
+        fig = plt.figure(dpi = dpi)
+        
+        legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
+
+        c50units = 'sort your units!' # UNITS NEED WORK
+        
+        # generate x and y values 
+        table = self.mean_amplitude()
+        amps = table[table['Type'] == type_to_plot]
+        x = amps['Concentration']
+        y = amps['Amplitude']
+        yerr = amps['Error']
+        
+        # get units 
+        units = amps['Concentration Units'].unique()
+        if len(units) != 1:
+            raise ValueError("Too many units!")
+        c50units = units[0]
+        
+        
+        # compound name to use
+        compound = amps['Compound'][1]
+        
+        # x values for fit
+        fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
+        # fit y values
+        fit = func_dict[plot_func](fit_x, *popt)
+                
+        l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
+        
+        # plot line of best fit
+        plt.plot(fit_x, fit, c = 'black', lw = 1.2)
+        # plot errors (for each mean condition)
+        plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+
+        # generate empty handle (hides legend handle)
+        handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
+                                         lw=0, alpha=0)]
+
+        # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
+        leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
+                  handlelength=0, handletextpad=0)
+        
+        # log x scale (long conc)
+        plt.xscale('log')
+        plt.minorticks_off()
+        
+        # labels
+        plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+        plt.xlabel("log [{}]".format(compound))
+        
+        plt.show()
