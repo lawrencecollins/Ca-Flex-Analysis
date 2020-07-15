@@ -504,6 +504,6 @@ class CaFlexAnalysis:
         
         # labels
         plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-        plt.xlabel("log [{}]".format(compound))
+        plt.xlabel("[{}]".format(compound))
         
         plt.show()
