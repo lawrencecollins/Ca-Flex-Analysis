@@ -403,6 +403,48 @@ class CaFlexAnalysis:
         mean_response['Error'] = group.groupby(self.grouplist).sem().reset_index()['Amplitude']
         return mean_response
     
+    # define plotting function (cleans up plot_curve)
+    def _logistic_regression(self, x, y, yerr, plot_func, compound, protein, c50units, dpi, **kwargs):
+        """Plots logistic regression fit with errors on y axis. """
+        # c50 dictionary for accessing functions for plot fitting
+        func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
+        
+        # get popt values for logistic regression
+        popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs) 
+        
+        # x values for fit
+        fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
+        # fit y values
+        fit = func_dict[plot_func](fit_x, *popt)
+
+        # annotations
+        legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
+        l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
+
+        # initialise figure - CHANGE TO SUBPLOTS 
+        fig = plt.figure(dpi = dpi)
+
+        # plot line of best fit
+        plt.plot(fit_x, fit, c = 'black', lw = 1.2)
+        # plot errors (for each mean condition)
+        plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+
+        # generate empty handle (hides legend handle - see next comment)
+        handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
+                                         lw=0, alpha=0)]
+        # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
+        leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
+                  handlelength=0, handletextpad=0)
+
+        # log x scale (long conc)
+        plt.xscale('log')
+        plt.minorticks_off()
+
+        # axes labels
+        plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+        plt.xlabel("[{}]".format(compound))
+        plt.title(protein)
+        
     def plot_curve(self, plot_func, type_to_plot = 'compound', title = 'auto', dpi = 120, n = 5, **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
@@ -419,9 +461,6 @@ class CaFlexAnalysis:
         :return: Figure with fitted dose-response curve
         :rtype: fig
         """
-        # c50 dictionary for accessing functions for plot fitting
-        func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
-        
         # get data 
         table = self.mean_amplitude()
         amps = self.mean_amplitude()[self.mean_amplitude().Type == 'compound']
@@ -448,49 +487,18 @@ class CaFlexAnalysis:
                         # check there is an adequate number of concs
                     if len(temp['Concentration']) < n:
                         raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), proteins[i], compounds[j], n))
-                    
+
                     # get x, y and error values
                     x = temp['Concentration']
                     y = temp['Amplitude']
                     yerr = temp['Error']
                     c50units = temp['Concentration Units'].unique()[0]
-                    
-                    # get popt values for logistic regression
-                    popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs)  
-                    # compound name to use
+
+                    #compound and protein names to use
                     compound = compounds[j]
-                    
-                    # x values for fit
-                    fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
-                    # fit y values
-                    fit = func_dict[plot_func](fit_x, *popt)
-                    
-                    # annotations
-                    legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
-                    l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
-                    
-                    # initialise figure
-                    fig = plt.figure(dpi = dpi)
-                    
-                    # plot line of best fit
-                    plt.plot(fit_x, fit, c = 'black', lw = 1.2)
-                    # plot errors (for each mean condition)
-                    plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+                    protein = proteins[i]
 
-                    # generate empty handle (hides legend handle - see next comment)
-                    handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
-                                                     lw=0, alpha=0)]
-                    # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
-                    leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
-                              handlelength=0, handletextpad=0)
-
-                    # log x scale (long conc)
-                    plt.xscale('log')
-                    plt.minorticks_off()
-
-                    # axes labels
-                    plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-                    plt.xlabel("[{}]".format(compound))
+                    self._logistic_regression(x, y, yerr, plot_func, compound, protein, c50units, dpi)
 
         except:
             print("value error exception")
