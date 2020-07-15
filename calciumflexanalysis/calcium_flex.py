@@ -21,23 +21,13 @@ def read_in_new(raw_data):
     return df
 
 # curve fitting functions
-# ec50 function
 def _ec50_func(x,top,bottom, ec50, hill):
     z=(ec50/x)**hill
     return (bottom + ((top-bottom)/(1+z)))   
 
-# ic50 function
 def _ic50_func(x,top,bottom, ic50, hill):
     z=(ic50/x)**hill
     return (top - ((top-bottom)/(1+z)))
-
-# c50 dictionary for accessing functions
-func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
-
-
-
-
-
 
 class CaFlexAnalysis:
     """Class used for the analysis of Calcium Flex assays.
@@ -397,14 +387,12 @@ class CaFlexAnalysis:
         self.processed_data['plateau'] = {}
         self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
         
-        
     def mean_amplitude(self):
         """Returns mean amplitudes and error for each condition.
         
         :return: Mean amplitudes and error for each condition
         :rtype: Pandas DataFrame
         """
-        
         mapped = self.plate_map.fillna(-1).join(self.processed_data['plateau']['data'])
         # group by grouplist and take mean amplitude for each condition
         # filter for valid wells
@@ -414,30 +402,8 @@ class CaFlexAnalysis:
         mean_response = group.groupby(self.grouplist).mean().reset_index()
         mean_response['Error'] = group.groupby(self.grouplist).sem().reset_index()['Amplitude']
         return mean_response
- 
-
-    # logistic fit
-    def _logistic_fit(self, plot_func, type_to_plot = 'compound', **kwargs):
-        """Generates logistic fit for ic50/ec50 plot from mean amplitudes.
-        
-        :param plot_func: Plot function to use, either ic50 or ec50
-        :type plot_func: str
-        :param type_to_plot: Type of condition to plot, default = 'compound'
-        :type type_to_plot: str
-        :return: array containing 'top', 'bottom', plot_func ('ec50' or 'ic50') and 'hill'
-        :rtype: numpy array
-        """
-        # get data
-        table = self.mean_amplitude()
-        amps = table[table['Type'] == type_to_plot] 
-        x = amps['Concentration']
-        y = amps['Amplitude']
-        
-        # generate top, bottom, plot_func and hill values
-        popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs)
-        return popt
     
-    def plot_curve(self, plot_func, type_to_plot = 'compound', title = 'auto', dpi = 120, **kwargs):
+    def plot_curve(self, plot_func, type_to_plot = 'compound', title = 'auto', dpi = 120, n = 5, **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -448,62 +414,83 @@ class CaFlexAnalysis:
         :type title: str
         :param dpi: Size of figure
         :type dpi: int
+        :param n: Number of concentrations required for plot
+        :type n: int
         :return: Figure with fitted dose-response curve
         :rtype: fig
-        
         """
-        # get popt values for logistic regression
-        popt = self._logistic_fit(plot_func, type_to_plot, **kwargs)
+        # c50 dictionary for accessing functions for plot fitting
+        func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
         
-        fig = plt.figure(dpi = dpi)
-        
-        legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
-
-        c50units = 'sort your units!' # UNITS NEED WORK
-        
-        # generate x and y values 
+        # get data 
         table = self.mean_amplitude()
-        amps = table[table['Type'] == type_to_plot]
-        x = amps['Concentration']
-        y = amps['Amplitude']
-        yerr = amps['Error']
+        amps = self.mean_amplitude()[self.mean_amplitude().Type == 'compound']
         
-        # get units 
-        units = amps['Concentration Units'].unique()
-        if len(units) != 1:
-            raise ValueError("Too many units!")
-        c50units = units[0]
+        # get names of proteins and compounds
+        proteins = amps['Protein'].unique()
+        compounds = amps['Compound'].unique()
         
+        # get number of proteins and compounds
+        p_len = len(proteins)
+        c_len = len(compounds)
         
-        # compound name to use
-        compound = amps['Compound'][1]
-        
-        # x values for fit
-        fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
-        # fit y values
-        fit = func_dict[plot_func](fit_x, *popt)
-                
-        l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
-        
-        # plot line of best fit
-        plt.plot(fit_x, fit, c = 'black', lw = 1.2)
-        # plot errors (for each mean condition)
-        plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+        # check units and number of concentrations
+        try:
+            # seperate proteins
+            for i in range(p_len):
+                # seperate compounds for each protein
+                for j in range(c_len):
+                    # filter dataframe for each compound in each protein
+                    temp = amps[(amps['Protein'] == proteins[i]) & (amps['Compound'] == compounds[j])]
+                    # check there is only 1 conc unit
+                    if len(temp['Concentration Units'].unique()) > 1:
+                        raise ValueError["One unit per condition please!"]
+                        # check there is an adequate number of concs
+                    if len(temp['Concentration']) < n:
+                        raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), proteins[i], compounds[j], n))
+                    
+                    # get x, y and error values
+                    x = temp['Concentration']
+                    y = temp['Amplitude']
+                    yerr = temp['Error']
+                    c50units = temp['Concentration Units'].unique()[0]
+                    
+                    # get popt values for logistic regression
+                    popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs)  
+                    # compound name to use
+                    compound = compounds[j]
+                    
+                    # x values for fit
+                    fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
+                    # fit y values
+                    fit = func_dict[plot_func](fit_x, *popt)
+                    
+                    # annotations
+                    legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
+                    l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
+                    
+                    # initialise figure
+                    fig = plt.figure(dpi = dpi)
+                    
+                    # plot line of best fit
+                    plt.plot(fit_x, fit, c = 'black', lw = 1.2)
+                    # plot errors (for each mean condition)
+                    plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
 
-        # generate empty handle (hides legend handle)
-        handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
-                                         lw=0, alpha=0)]
+                    # generate empty handle (hides legend handle - see next comment)
+                    handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
+                                                     lw=0, alpha=0)]
+                    # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
+                    leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
+                              handlelength=0, handletextpad=0)
 
-        # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
-        leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
-                  handlelength=0, handletextpad=0)
-        
-        # log x scale (long conc)
-        plt.xscale('log')
-        plt.minorticks_off()
-        
-        # labels
-        plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-        plt.xlabel("[{}]".format(compound))
-        
-        plt.show()
+                    # log x scale (long conc)
+                    plt.xscale('log')
+                    plt.minorticks_off()
+
+                    # axes labels
+                    plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+                    plt.xlabel("[{}]".format(compound))
+
+        except:
+            print("value error exception")
