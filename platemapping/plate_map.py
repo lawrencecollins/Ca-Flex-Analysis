@@ -79,7 +79,7 @@ def plate_map(file, size = 96, valid = True):
     df = df.set_index(df['Well ID'])
     
         # check there are no repeats
-    if len(df.index) != size:
+    if len(df.index.unique()) != len(df.index):
         raise ValueError("Check your plate map! Incorrect number of wells.")
     
     # correct typos due to capitalisation and trailing spaces
@@ -132,9 +132,7 @@ def short_map(file, size = 96, valid = True):
         filleddf = filleddf.append(temp)
         
         # check there are no repeats
-        if filleddf.shape[0] != size:
-            raise ValueError("Incorrect number of wells!")
-        if len(filleddf.index) != size:
+        if len(filleddf.index.unique()) != len(filleddf.index):
             raise ValueError("Check your plate map! Incorrect number of wells.")
     
     # insert filled df into empty plate map to include empty rows 
