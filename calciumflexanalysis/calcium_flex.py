@@ -36,6 +36,8 @@ class CaFlexAnalysis:
     :type raw_data: .txt file
     :param plate_map_file: Filled template plate map that contains the information for each well of the well plate
     :type plate_map_file: .csv
+    :param inject: Activator injection time point
+    :type inject: float or int
     :param map_type: 'short' or 'long' - Denotes the type of plate map file used, default = 'short'
     :type map_type: str
     :param size: Size of well plate - 6, 12, 24, 48, 96 or 384. plate_map_file MUST have the appropriate dimensions, default = 96
@@ -49,9 +51,10 @@ class CaFlexAnalysis:
     :param plate_map: plate_map_file converted as a dataframe
     :type plate_map: pandas dataframe
     """
-    def __init__(self, raw_data, plate_map_file, map_type = 'short', data_type = 'old', valid = True, size = 96):
+    def __init__(self, raw_data, plate_map_file, inject, map_type = 'short', data_type = 'old', valid = True, size = 96):
         self.raw_data = raw_data
         self.plate_map_file = plate_map_file
+        self.inject = inject
         self.map_type = map_type
         self.size = size
         self.data_type = data_type
@@ -250,8 +253,7 @@ class CaFlexAnalysis:
         
     def baseline_correct(self):
         """Baseline corrects 'ratio' data using the pre-injection time points."""
-        inject = 60 # DEFINE INJECT IN CLASS
-        time_cut = inject - 5
+        time_cut = self.inject - 5
         data_source = self.processed_data['ratio']
         # convert to numpy arrays
         time = data_source['time'].to_numpy()
@@ -280,7 +282,7 @@ class CaFlexAnalysis:
         valid_filter = self.plate_map.Valid == True
 
         # add opposite time filter to extract data after injection
-        time_cut = 55
+        time_cut = self.inject - 5
         data_source = self.processed_data[data_type]
 
         # convert to numpy arrays
@@ -345,29 +347,45 @@ class CaFlexAnalysis:
         :rtype: fig
         """
         platemap = self.plate_map
+        data_dict = self.processed_data[data_type] # dictionary containing df's of chosen data_type
         plt.figure(dpi = dpi)
         groupdct = {}
-        for key, val in self.processed_data['baseline_corrected'].items():
+        for key, val in data_dict.items():
             mapped = platemap.join(val)
             group = mapped[mapped.Valid == True].groupby(self.grouplist)[val.columns]
             # update dictionary
             groupdct[key] = group
-
+           
+        # mean data and time
+        mean_time = groupdct['time'].mean()
+        mean_data = groupdct['data'].mean()
+        error_data = groupdct['data'].sem()
         # plot series for each condition and control
-        for i in range(len(groupdct['time'].mean())):
-            plt.errorbar(groupdct['time'].mean().iloc[i], groupdct['data'].mean().iloc[i], yerr=groupdct['data'].sem().iloc[i], 
+        for i in range(len(mean_time)):
+            plt.errorbar(mean_time.iloc[i], mean_data.iloc[i], yerr=error_data.iloc[i], 
                          capsize = 3, 
-                         label = "{}, {}".format(list(groupdct['data'].mean().index.get_level_values('Concentration'))[i], 
-                                                list(groupdct['data'].mean().index.get_level_values('Compound'))[i])) 
+                         label = "{}, {}".format(list(mean_data.index.get_level_values('Concentration'))[i], 
+                                                list(mean_data.index.get_level_values('Compound'))[i])) 
             # add label function that concatenates conc w/ the correct units 
         plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
-        plt.xlabel("time / s")
+        plt.xlabel("time (s)")
         plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-
+        
+        # add line representing the activator
+        times = data_dict['time'].mean() # get times
+        time_filter = times > (self.inject - 5) # mean time series that contains activator
+        # get start and end points
+        injection_start = times[time_filter].iloc[0]
+        injection_end = times[time_filter].iloc[-1]
+        # get max y 
+        ymax = mean_data.max().max() + mean_data.max().max()*0.1 # add a bit extra to prevent clash w/ data
+        plt.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
+        
+        # show window
         if show_window == True:
             # x min and x max for axvspan 
-            xmin = self.processed_data['baseline_corrected']['time'].loc[:, self.window[0]].mean()
-            xmax = self.processed_data['baseline_corrected']['time'].loc[:, self.window[1]].mean()
+            xmin = data_dict['time'].loc[:, self.window[0]].mean()
+            xmax = data_dict['time'].loc[:, self.window[1]].mean()
             plt.axvspan(xmin, xmax, facecolor = 'hotpink', alpha = 0.5)
         
         plt.show()
@@ -488,17 +506,16 @@ class CaFlexAnalysis:
                     if len(temp['Concentration']) < n:
                         raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), proteins[i], compounds[j], n))
 
-                    # get x, y and error values
+                    # get x, y and error values, c50 units, compound and protein names to use for plot
                     x = temp['Concentration']
                     y = temp['Amplitude']
                     yerr = temp['Error']
                     c50units = temp['Concentration Units'].unique()[0]
-
-                    #compound and protein names to use
                     compound = compounds[j]
                     protein = proteins[i]
-
+                    
+                    # plot curve with line of best fit
                     self._logistic_regression(x, y, yerr, plot_func, compound, protein, c50units, dpi)
-
+                    
         except:
             print("value error exception")
