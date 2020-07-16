@@ -483,36 +483,36 @@ class CaFlexAnalysis:
         table = self.mean_amplitude()
         amps = self.mean_amplitude()[self.mean_amplitude().Type == 'compound']
         
-        # get names of proteins and compounds
+        # get names of proteins
         proteins = amps['Protein'].unique()
-        compounds = amps['Compound'].unique()
-        
-        # get number of proteins and compounds
+        # get number of proteins 
         p_len = len(proteins)
-        c_len = len(compounds)
         
         # check units and number of concentrations
         try:
             # seperate proteins
-            for i in range(p_len):
-                # seperate compounds for each protein
-                for j in range(c_len):
+            for p in range(p_len):
+                # get names of compounds for each protein
+                compounds = amps[amps['Protein'] == proteins[p]]['Compound'].unique()
+                # get number of comounds for each protein 
+                c_len = len(compounds)
+                for c in range(c_len):
                     # filter dataframe for each compound in each protein
-                    temp = amps[(amps['Protein'] == proteins[i]) & (amps['Compound'] == compounds[j])]
+                    temp = amps[(amps['Protein'] == proteins[p]) & (amps['Compound'] == compounds[c])]
                     # check there is only 1 conc unit
                     if len(temp['Concentration Units'].unique()) > 1:
                         raise ValueError["One unit per condition please!"]
                         # check there is an adequate number of concs
                     if len(temp['Concentration']) < n:
-                        raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), proteins[i], compounds[j], n))
+                        raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), proteins[p], compounds[c], n))
 
                     # get x, y and error values, c50 units, compound and protein names to use for plot
                     x = temp['Concentration']
                     y = temp['Amplitude']
                     yerr = temp['Error']
                     c50units = temp['Concentration Units'].unique()[0]
-                    compound = compounds[j]
-                    protein = proteins[i]
+                    compound = compounds[c]
+                    protein = proteins[p]
                     
                     # plot curve with line of best fit
                     self._logistic_regression(x, y, yerr, plot_func, compound, protein, c50units, dpi)
