@@ -29,6 +29,15 @@ def _ic50_func(x,top,bottom, ic50, hill):
     z=(ic50/x)**hill
     return (top - ((top-bottom)/(1+z)))
 
+def plot_color(dataframe, cmap, iterrange):
+    """Returns a color for each index value (accessed by iterrange) of a dataframe"""
+    types = list(dataframe.index)
+    cmap = plt.get_cmap(cmap)
+    colors = cmap(np.linspace(0, 1, len(types)))
+    colordict = dict(zip(types, colors))
+    color = colordict.get(dataframe.index[iterrange])
+    return color
+
 class CaFlexAnalysis:
     """Class used for the analysis of Calcium Flex assays.
     
@@ -330,66 +339,121 @@ class CaFlexAnalysis:
         window_filter = np.nanmean(time_df,axis=0) >= time
         index = np.array(list(data_source['data'].columns))[window_filter]
         self.window =  (index[0], index[10])
-    
-    
-    def plot_conditions(self, data_type, show_window = False, dpi = 120):
-        """Plots each mean condition versus time.
         
-        'show_window' uses axvspan to visualise what section of the series is being used to calculate amplitudes. This can be defined using 'get_window' (automatically calculates flattest gradient), or 'def_window' (allows the user to manually input the time point of the plateau).
+    def plot_conditions(self, data_type, activator = " ", show_window = False, dpi = 120, title = " ", error = False, control = True, cmap = "winter_r"):
         
-        :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
-        :type data_type: str
-        :param show_plateau: If 'True', shows the location of the plateau on the series, default = False 
-        :type show_plateau: bool
-        :param dpi: Size of figure
-        :type dpi: int
-        :return: Figure displaying each mean condition versus time
-        :rtype: fig
-        """
+                # new plot_conditions code
         platemap = self.plate_map
-        data_dict = self.processed_data[data_type] # dictionary containing df's of chosen data_type
-        plt.figure(dpi = dpi)
+        grouplist = self.grouplist
         groupdct = {}
-        for key, val in data_dict.items():
-            mapped = platemap.join(val)
-            group = mapped[mapped.Valid == True].groupby(self.grouplist)[val.columns]
+
+        for key, val in self.processed_data['ratio'].items():
+            data_length = val.shape[1]
+            mapped = platemap.fillna('none').join(val)
+            group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
             # update dictionary
             groupdct[key] = group
-           
-        # mean data and time
-        mean_time = groupdct['time'].mean()
-        mean_data = groupdct['data'].mean()
-        error_data = groupdct['data'].sem()
-        # plot series for each condition and control
-        for i in range(len(mean_time)):
-            plt.errorbar(mean_time.iloc[i], mean_data.iloc[i], yerr=error_data.iloc[i], 
-                         capsize = 3, 
-                         label = "{}, {}".format(list(mean_data.index.get_level_values('Concentration'))[i], 
-                                                list(mean_data.index.get_level_values('Compound'))[i])) 
-            # add label function that concatenates conc w/ the correct units 
-        plt.legend(loc = "upper right", bbox_to_anchor = (1.35, 1.0))
-        plt.xlabel("time (s)")
-        plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-        
-        # add line representing the activator
-        times = data_dict['time'].mean() # get times
-        time_filter = times > (self.inject - 5) # mean time series that contains activator
-        # get start and end points
-        injection_start = times[time_filter].iloc[0]
-        injection_end = times[time_filter].iloc[-1]
-        # get max y 
-        ymax = mean_data.max().max() + mean_data.max().max()*0.1 # add a bit extra to prevent clash w/ data
-        plt.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
-        
-        # show window
-        if show_window == True:
-            # x min and x max for axvspan 
-            xmin = data_dict['time'].loc[:, self.window[0]].mean()
-            xmax = data_dict['time'].loc[:, self.window[1]].mean()
-            plt.axvspan(xmin, xmax, facecolor = 'hotpink', alpha = 0.5)
-        
-        plt.show()
-        
+
+        # get data, time and error values for each condition
+        data = groupdct['data'].mean().reset_index()
+        time = groupdct['time'].mean().reset_index()
+        yerr = groupdct['data'].sem().reset_index()
+
+        # get names of proteins and compounds, excluding control
+        proteins = data[data['Type'].str.contains('control') == False]['Protein'].unique()
+        # get number of proteins 
+        p_len = len(proteins)
+        for p in range (p_len):
+            # get number of compounds for each protein
+            compounds = data[(data['Type'].str.contains('control') == False) & (data['Protein'] == proteins[p])]['Compound'].unique()
+            c_len = len(compounds)
+            for c in range (c_len):
+
+                # extract data for each protein and compound, excluding control. 
+                data_temp = data[data['Type'].str.contains('control') == False]
+                data_temp = data_temp[(data_temp['Protein'] == proteins[p]) & (data_temp['Compound'] == compounds[c])]
+
+                time_temp = time[time['Type'].str.contains('control') == False]
+                time_temp = time_temp[(time_temp['Protein'] == proteins[p]) & (time_temp['Compound'] == compounds[c])]
+
+                yerr_temp = yerr[yerr['Type'].str.contains('control') == False]
+                yerr_temp = yerr_temp[(yerr_temp['Protein'] == proteins[p]) & (yerr_temp['Compound'] == compounds[c])]
+
+                templist = [x for x in grouplist if x != 'Concentration'] # get columns to remove
+
+                # extract just the data with conc as the index
+                data_temp = data_temp.set_index('Concentration').iloc[:, -data_length:]
+                time_temp = time_temp.set_index('Concentration').iloc[:, -data_length:]
+                yerr_temp = yerr_temp.set_index('Concentration').iloc[:, -data_length:]
+
+                if control == True:
+                    control_data = data[data['Type'].str.contains('control') == True]
+                    control_data = control_data[(control_data['Protein'] == proteins[p])].iloc[:, -data_length:]
+
+                    control_time = time[time['Type'].str.contains('control') == True]
+                    control_time = control_time[(control_time['Protein'] == proteins[p])].iloc[:, -data_length:]
+
+                # stops empty rows being plotted
+                if (proteins[p] != 'none') & (compounds[c] != 'none'):
+
+                    fig, ax = plt.subplots(dpi = 120)
+
+                    # control 
+                    if control == True:
+                        ctrl_label = "{} (control)".format(platemap['Contents'][(platemap['Type'] == 'control') & (platemap['Protein'] == proteins[p])].unique()[0])
+                        ax.plot(control_time.iloc[0], control_data.iloc[0], '-o', color = 'black', mfc = 'white', lw = 1, zorder = 2, 
+                                label = ctrl_label)
+
+                # plot series, iterating down rows
+                    for i in range(len(time_temp)):
+                        if error == True:
+                            ax.errorbar(x = time_temp.iloc[i], y = data_temp.iloc[i], yerr = yerr_temp.iloc[i],
+                                       capsize = 3, zorder=1, color = plot_color(data_temp, cmap, i),
+                                       label = "{}".format(data_temp.index[i]))
+                        else: 
+                            ax.plot(time_temp.iloc[i], data_temp.iloc[i], '-o', zorder=1, label = "{} {}".format(data_temp.index[i], compounds[c]),
+                                   ms = 5, color = plot_color(data_temp, cmap, i))
+
+                        # add legend    
+                        ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False)
+
+                    # white background makes the exported figure look a lot nicer
+                    fig.patch.set_facecolor('white')
+
+                    # spines
+                    ax.spines['right'].set_visible(False)
+                    ax.spines['top'].set_visible(False)
+
+                    # add line representing the activator
+                    times = self.processed_data[data_type]['time'].mean() # get times
+                    time_filter = times > (self.inject - 5) # mean time series that contains activator
+
+                    # get start and end points
+                    injection_start = times[time_filter].iloc[0]
+                    injection_end = times[time_filter].iloc[-1]
+
+                    # add line indicating presence of activator
+                    ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash w/ data
+                    ax.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
+
+                    # activator title
+                    ax.text((injection_start+injection_end)/2, (ymax+ymax*0.05), activator, ha = 'center')
+
+                    # assay title
+                    ax.set_title(title, x = 0, fontweight = '550')
+
+                    # axes labels
+                    ax.set_xlabel("time (s)")
+                    ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+
+                    if show_window == True:
+                        # x min and x max for axvspan 
+                        xmin = time_temp.loc[:, self.window[0]].mean()
+                        xmax = time_temp.loc[:, self.window[1]].mean()
+                        ax.axvspan(xmin, xmax, facecolor = 'hotpink', alpha = 0.5)
+
+                plt.show()
+
     def amplitude(self, data_type):
         """Calculates response amplitude for each condition, updates processed_data dictionary with 'plateau' and plate_map with amplitude column. 
         
@@ -422,7 +486,7 @@ class CaFlexAnalysis:
         return mean_response
     
     # define plotting function (cleans up plot_curve)
-    def _logistic_regression(self, x, y, yerr, plot_func, compound, protein, c50units, dpi, **kwargs):
+    def _logistic_regression(self, x, y, yerr, title, plot_func, compound, protein, c50units, dpi, **kwargs):
         """Plots logistic regression fit with errors on y axis. """
         # c50 dictionary for accessing functions for plot fitting
         func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
@@ -440,18 +504,18 @@ class CaFlexAnalysis:
         l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
 
         # initialise figure - CHANGE TO SUBPLOTS 
-        fig = plt.figure(dpi = dpi)
+        fig, ax = plt.subplots(dpi = dpi)
 
         # plot line of best fit
-        plt.plot(fit_x, fit, c = 'black', lw = 1.2)
+        ax.plot(fit_x, fit, c = 'black', lw = 1.2)
         # plot errors (for each mean condition)
-        plt.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+        ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
 
         # generate empty handle (hides legend handle - see next comment)
         handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
                                          lw=0, alpha=0)]
         # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
-        leg = plt.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
+        leg = ax.legend(handles, l, loc = 'best', frameon = False,framealpha=0.7, 
                   handlelength=0, handletextpad=0)
 
         # log x scale (long conc)
@@ -461,9 +525,13 @@ class CaFlexAnalysis:
         # axes labels
         plt.ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
         plt.xlabel("[{}]".format(compound))
-        plt.title(protein)
+        plt.title(title, loc = 'left')
         
-    def plot_curve(self, plot_func, type_to_plot = 'compound', title = 'auto', dpi = 120, n = 5, **kwargs):
+        # spines
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        
+    def plot_curve(self, plot_func, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -515,7 +583,7 @@ class CaFlexAnalysis:
                     protein = proteins[p]
                     
                     # plot curve with line of best fit
-                    self._logistic_regression(x, y, yerr, plot_func, compound, protein, c50units, dpi)
+                    self._logistic_regression(x, y, yerr, title, plot_func, compound, protein, c50units, dpi)
                     
-        except:
+        except ValueError:
             print("value error exception")
