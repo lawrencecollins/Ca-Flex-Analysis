@@ -371,6 +371,8 @@ class CaFlexPlate:
         
         :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
         :type data_type: str
+        :param activator: Activator injected into assay, default = ""
+        :type activator: str
         :param show_window: If 'True', shows the window from which the plateau for each condition is calculated, default = False 
         :type show_window: bool
         :param dpi: Size of figure, default = 120
@@ -388,13 +390,12 @@ class CaFlexPlate:
         :return: Figure displaying each mean condition versus time
         :rtype: fig
         """
-        
 
         platemap = self.plate_map
         grouplist = self.grouplist
         groupdct = {}
 
-        for key, val in self.processed_data['ratio'].items():
+        for key, val in self.processed_data[data_type].items():
             data_length = val.shape[1]
             mapped = platemap.fillna('none').join(val)
             group = mapped[mapped.Valid == True].groupby(grouplist)[val.columns]
@@ -518,24 +519,48 @@ class CaFlexPlate:
         self.processed_data['plateau'] = {}
         self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
         
-    def mean_amplitude(self):
+    def mean_amplitude(self, use_normalised = False):
         """Returns mean amplitudes and error for each condition.
         
+        The user must run the normalise method before attempting to get the mean amplitudes of the normalised amplitudes.
+        
+        :param use_normalised: If True, uses normalised amplitudes, default = False
+        :type use_normalised: bool
         :return: Mean amplitudes and error for each condition
         :rtype: Pandas DataFrame
         """
         mapped = self.plate_map.fillna(-1).join(self.processed_data['plateau']['data'])
+        if use_normalised == True:
+            mapped = self.plate_map.fillna(-1).join(self.processed_data['plateau']['data_normed'])
         # group by grouplist and take mean amplitude for each condition
         # filter for valid wells
         group = mapped[mapped.Valid == True] 
         # drop columns which can cause errors w/ groupby operations
         group.drop(['Valid', 'Column'], axis = 1, inplace = True)
         mean_response = group.groupby(self.grouplist).mean().reset_index()
-        mean_response['Error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'Amplitude']
+        if use_normalised == False:
+            mean_response['Amplitude Error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'Amplitude']
+        else:
+            mean_response['amps_normed_error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'amps_normed']
+        
+        # update data dict
+        self.processed_data['mean_amplitudes'] = mean_response
+        
         return mean_response
     
-    # define plotting function (cleans up plot_curve)
-    def _logistic_regression(self, x, y, yerr, title, plot_func, compound, protein, c50units, dpi, **kwargs):
+    def normalise(self):
+        """Normalises amplitudes to mean control amplitude"""
+        mean_amps = self.mean_amplitude(use_normalised = False)
+        amps = self.processed_data['plateau']['data']
+        control_amp = float(mean_amps[mean_amps['Type'] == 'control']['Amplitude'])
+        self.processed_data['plateau']['data_normed'] = "test"
+        self.processed_data['plateau']['data_normed'] = ((amps * 100) / control_amp).rename(columns = {'Amplitude':'amps_normed'})
+
+
+        return self.processed_data['plateau']['data_normed']
+
+    # define plotting function (cleans up plot_
+    def _logistic_regression(self, x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, **kwargs):
         """Plots logistic regression fit with errors on y axis. """
         # c50 dictionary for accessing functions for plot fitting
         func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
@@ -575,7 +600,14 @@ class CaFlexPlate:
         plt.minorticks_off()
 
         # axes labels
-        ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+        if use_normalised == False:
+            ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+        else:
+            if activator == "":
+                ax.set_ylabel("% of activation")
+            else:
+                ax.set_ylabel("% of activation by {}".format(activator))
+        
         ax.set_xlabel("[{}]".format(compound))
         ax.set_title(title, x = 0, fontweight = '550')
         
@@ -585,11 +617,15 @@ class CaFlexPlate:
         
         plt.show()
         
-    def plot_curve(self, plot_func, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], **kwargs):
+    def plot_curve(self, plot_func, activator = "", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
         :type plot_func: str
+        :param activator: Activator injected into assay, default = ""
+        :type activator: str
+        :param use_normalised: If True, uses normalised amplitudes, default = False
+        :type use_normalised: bool
         :param type_to_plot: Type of condition to plot, default = 'compound'
         :type type_to_plot: str
         :param title: Choose between automatic title or insert string to use, default = 'auto'
@@ -602,8 +638,8 @@ class CaFlexPlate:
         :rtype: fig
         """
         # get data 
-        table = self.mean_amplitude()
-        amps = self.mean_amplitude()[self.mean_amplitude().Type == 'compound']
+        table = self.mean_amplitude(use_normalised)
+        amps = table[table.Type == 'compound']
         
         # get names of proteins
         if proteins == []:
@@ -629,14 +665,14 @@ class CaFlexPlate:
 
                     # get x, y and error values, c50 units, compound and protein names to use for plot
                     x = temp['Concentration']
-                    y = temp['Amplitude']
-                    yerr = temp['Error']
+                    y = temp.iloc[:, -2]
+                    yerr = temp.iloc[:, -1]
                     c50units = temp['Concentration Units'].unique()[0]
                     compound = cval
                     protein = pval
                     
                     # plot curve with line of best fit
-                    self._logistic_regression(x, y, yerr, title, plot_func, compound, protein, c50units, dpi, **kwargs)
+                    self._logistic_regression(x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, **kwargs)
                     
         except ValueError: # customise errors
             print("value error exception")
