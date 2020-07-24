@@ -31,12 +31,22 @@ def _ic50_func(x,top,bottom, ic50, hill):
     return (top - ((top-bottom)/(1+z)))
 
 def plot_color(dataframe, cmap, iterrange):
-    """Returns a color for each index value (accessed by iterrange) of a dataframe"""
+    """Returns a color for each index value (accessed by iterrange) of a dataframe."""
     types = list(dataframe.index)
     cmap = plt.get_cmap(cmap)
     colors = cmap(np.linspace(0, 1, len(types)))
     colordict = dict(zip(types, colors))
     color = colordict.get(dataframe.index[iterrange])
+    return color
+
+def get_color(condition_list, cmap, name):
+    """Returns a color for each condition plotted. 
+    
+    Similar to plot_color() but used for lists instead of dataframes - see plot_curve(combine = True)."""
+    cmap = plt.get_cmap(cmap)
+    colors = cmap(np.linspace(0, 1, len(condition_list)))
+    colordict = dict(zip(condition_list, colors))
+    color = colordict.get(name)
     return color
 
 class CaFlexPlate:
@@ -542,7 +552,9 @@ class CaFlexPlate:
             mean_response['Amplitude Error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'Amplitude']
         else:
             mean_response['amps_normed_error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'amps_normed']
-        
+        # drop empty rows
+        mean_response.drop(mean_response[mean_response['Type'] == 'empty'].index)
+
         # update data dict
         self.processed_data['mean_amplitudes'] = mean_response
         
@@ -550,7 +562,7 @@ class CaFlexPlate:
     
     def normalise(self):
         """Normalises amplitudes to mean control amplitude"""
-        mean_amps = self.mean_amplitude(use_normalised = False)
+        mean_amps = self.mean_amplitude(use_normalised = False) # get mean control amplitude
         amps = self.processed_data['plateau']['data']
         control_amp = float(mean_amps[mean_amps['Type'] == 'control']['Amplitude'])
         self.processed_data['plateau']['data_normed'] = "test"
@@ -560,16 +572,13 @@ class CaFlexPlate:
         return self.processed_data['plateau']['data_normed']
 
     # define plotting function (cleans up plot_
-    def _logistic_regression(self, x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, **kwargs):
+    def _logistic_regression(self, x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, error_bar, **kwargs):
         """Plots logistic regression fit with errors on y axis. """
         # c50 dictionary for accessing functions for plot fitting
         func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
         
         # get popt values for logistic regression
         popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs) 
-        
-        # save values for export
-        self.popt = popt
         
         # x values for fit
         fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
@@ -580,13 +589,14 @@ class CaFlexPlate:
         legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
         l = ["{} = {:.2f} {} \nHill slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])]
 
-        # initialise figure - CHANGE TO SUBPLOTS 
+        # initialise figure 
         fig, ax = plt.subplots(dpi = dpi)
 
         # plot line of best fit
         ax.plot(fit_x, fit, c = 'black', lw = 1.2)
         # plot errors (for each mean condition)
-        ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
+        if error_bar == True:
+            ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, c = 'black', label = l)
 
         # generate empty handle (hides legend handle - see next comment)
         handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
@@ -617,7 +627,7 @@ class CaFlexPlate:
         
         plt.show()
         
-    def plot_curve(self, plot_func, activator = "", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], **kwargs):
+    def plot_curve(self, plot_func, combine = False, activator = "", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -647,6 +657,13 @@ class CaFlexPlate:
 
         # check units and number of concentrations
         try:
+            if combine == True: # if combining plots, figure needs to remain outside of loop
+                fig, ax = plt.subplots(dpi = dpi)
+                # get a list of each condition across all plates
+                combos = amps.groupby(['Protein', 'Compound']).sum().reset_index()[['Protein', 'Compound']] # get unique combos
+                combos = list(combos.Protein.to_numpy() +" "+ combos.Compound.to_numpy()) # add combos to list
+                
+                
             # seperate proteins
             for pkey, pval in enumerate(proteins):
                 # get names of compounds for each protein
@@ -671,9 +688,66 @@ class CaFlexPlate:
                     compound = cval
                     protein = pval
                     
-                    # plot curve with line of best fit
-                    self._logistic_regression(x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, **kwargs)
-                    
+                    # plot curves with line of best fit, separate figures
+                    if combine == False:
+                        self._logistic_regression(x, y, yerr, use_normalised, activator, title, plot_func, compound, protein, c50units, dpi, error_bar, **kwargs)
+                        
+                    # plot on same figure
+                    else:
+                        # define dicts required for plot
+                        legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
+                        func_dict = {"ic50":_ic50_func, "ec50": _ec50_func}
+                        # get popt values for logistic regression
+                        popt, pcov = curve_fit(func_dict[plot_func], x, y) # add kwargs 
+        
+                        # x values for fit
+                        fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300) # extend by half an order of mag
+                        # fit y values
+                        fit = func_dict[plot_func](fit_x, *popt)
+                        label = r"$\bf{}\ {}$".format(pval, cval) +"\n{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3]) 
+                        
+                        # plot line of best fit
+                        ax.plot(fit_x, fit, lw = 1.2, label = label, color = get_color(combos, cmap, "{} {}".format(pval, cval)))
+                        # add errors
+                        if error_bar == True:        
+                            ax.errorbar(x, y, yerr, fmt = 'ko', ms = 3, capsize = 3)
+                            
+                        plt.xscale('log')
+                        
+                        
+            # edit combined figure outside of loop
+            if combine == True:
+                # generate empty handle (hides legend handle - see next comment)
+                handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
+                                                 lw=0, alpha=0)]
+                # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
+                leg = ax.legend(loc = 'best', frameon = False,framealpha=0.7)
+
+                # log x scale (long conc)
+                plt.xscale('log')
+                plt.minorticks_off()
+
+                # axes labels
+                if use_normalised == False:
+                    ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+                else:
+                    if activator == "":
+                        ax.set_ylabel("% of activation")
+                    else:
+                        ax.set_ylabel("% of activation by {}".format(activator))
+
+                ax.set_xlabel("[{}]".format(compound))
+                ax.set_title(title, x = 0, fontweight = '550')
+
+                # spines
+                ax.spines['right'].set_visible(False)
+                ax.spines['top'].set_visible(False)
+
+                plt.show()
+                        
+                        
+                        
+                        
         except ValueError: # customise errors
             print("value error exception")
             

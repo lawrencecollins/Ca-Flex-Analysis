@@ -193,13 +193,12 @@ class CaFlexGroup:
         
         print("self.data updated. See self.data[{}]['grouped']".format(data_type))
         
-    def plot_conditions(self, data_type, combine = False, plate_number = True, activator = " ", show_window = False, dpi = 120, title = "", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = [], **kwargs):
+    def plot_conditions(self, data_type, plate_number = True, activator = " ", show_window = False, dpi = 120, title = "", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = []):
         """Plots each mean condition versus time, for either each plate or over all plates, for each compound and protein.
         
         If no title is desired, set title to " ".
         
-        :param combine: If True, plot_conditions plots a single graph showing the mean of each condition over all plates, False plots each plate separately
-        :type combine: bool
+
         :param plate_number: If True, plate number is added to each plot title, default = True
         :type plate_number: bool
         :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
@@ -236,122 +235,111 @@ class CaFlexGroup:
                         Title = val.title
                 val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
                 
-        # plots separate plots of each compound and protein, combining the data across all plates        
+    def amplitude(self, data_type):
+        """Calculates response amplitude for each condition, for either each plate or across all plates.
+        
+        :param data_type: Data to use to calculate amplitudes, either 'ratio' or 'baseline_corrected'
+        :type data_type: str
+        :param combine: Generate amplitudes for each plate or across all plates, default = False
+        :type combine: bool
+        """
+
+        for key, val in enumerate(self.caflexplates):
+            val.amplitude(data_type)
+            print("self.processed_data['plateau']['data'] updated for plate {}.".format(key+1))
+                
+    def mean_amplitude(self, use_normalised = False, combine = False):
+        """Returns mean amplitudes and error for each condition, for either each plate or across all plates.
+        
+        The user must run the normalise method before attempting to get the mean amplitudes of the normalised amplitudes.
+        
+        :param use_normalised: If True, uses normalised amplitudes, default = False
+        :type use_normalised: bool
+        :return: Mean amplitudes and error for each condition
+        :rtype: Pandas DataFrame
+        :param combine: Generate mean amplitudes for each plate or across all plates, default = False
+        :type combine: bool
+        """
+        # check data_type == 'ratio' or 'baseline_corrected'
+        self.data['mean_amplitudes'] = {}
+        lst = []
+        
+        if combine == False:
+            for key, val in enumerate(self.caflexplates):
+                mean_amps = val.mean_amplitude(use_normalised) # get mean amps for each plate
+                self.data['mean_amplitudes'][key] = mean_amps # update self.data
+                print("self.data['mean_ampltitudes'][{}] updated".format(key))
+                
         if combine == True:
-            data = self.data[data_type]['grouped']['data']
-            time = self.data[data_type]['grouped']['time']
+            for key, val in enumerate(self.caflexplates):
+                # combine ampltitude data for each plate with its corresponding plate map
+                mapped = val.plate_map.fillna(-1).join(val.processed_data['plateau']['data'])
+                if use_normalised == True :
+                    # get normalised data if specified
+                    mapped = val.plate_map.fillna(-1).join(val.processed_data['plateau']['data_normed'])
+                # collect resulting dataframes    
+                lst.append(mapped)
+            # concatenate resulting dataframes        
+            mapped = pd.concat(lst)
+            # get only valid wells
+            group = mapped[mapped.Valid == True]
+            # drop columns which cause errors w/ grouby operations
+            group.drop(['Valid', 'Column'], axis = 1, inplace = True)
+            # get mean amps for each condition across all plates
+            mean_response = group.groupby(self.grouplist).mean().reset_index()
+            # get errors
+            if use_normalised == False:
+                mean_response['Amplitude Error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'Amplitude']
+            else:
+                mean_response['amps_normed_error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'amps_normed']
+            # drop empty rows
+            mean_response.drop(mean_response[mean_response['Type'] == 'empty'].index)
+            # update self.data
+            self.data['mean_amplitudes'] = mean_response
 
-            group = data[data.Valid == True]
-            group = group.drop('Valid', axis = 1)
-            t_group = time[time.Valid == True]
-            t_group = t_group.drop('Valid', axis = 1)
-
-            # get data, time and error values for each condition
-            data = group.groupby(self.grouplist)[group.columns].mean().reset_index()
-            time = t_group.groupby(self.grouplist)[t_group.columns].mean().reset_index()
-            yerr = group.groupby(self.grouplist)[group.columns].sem()
-
-            # for some reason in this instance the additional columns are not dropped, so we have to do it manually
-            # get columns list
-            dropcols = self.grouplist.copy() + ["Contents", "Row", "Well ID", "Column"]
-
-            # reset index
-            yerr = yerr.drop(dropcols, axis = 1).reset_index()
-
-            # get names of proteins and compounds, excluding control
-            if proteins == []:
-                proteins = data[data['Type'].str.contains('control') == False]['Protein'].unique()
-            # iterate through proteins list
-            for pkey, pval in enumerate(proteins):
-                # get number of compounds for each protein
-                if compounds == []:
-                    compounds = data[(data['Type'].str.contains('control') == False) & (data['Protein'] == pval)]['Compound'].unique()
-                # iterate through compounds for each protein
-                for ckey, cval in enumerate(compounds):
-
-                    # extract data for each protein and compound, excluding control. 
-                    data_temp = data[data['Type'].str.contains('control') == False]
-                    data_temp = data_temp[(data_temp['Protein'] == pval) & (data_temp['Compound'] == cval)]
-
-                    time_temp = time[time['Type'].str.contains('control') == False]
-                    time_temp = time_temp[(time_temp['Protein'] == pval) & (time_temp['Compound'] == cval)]
-
-                    yerr_temp = yerr[yerr['Type'].str.contains('control') == False]
-                    yerr_temp = yerr_temp[(yerr_temp['Protein'] == pval) & (yerr_temp['Compound'] == cval)]
-
-                    templist = [x for x in self.grouplist if x != 'Concentration'] # get columns to remove
-
-                    # extract just the data with conc as the index
-                    index = data_temp.loc[:, :self.grouplist[-1]]
-                    data_temp = data_temp.set_index('Concentration').drop(templist + ["Column"], axis = 1)
-                    time_temp = time_temp.set_index('Concentration').drop(templist + ["Column"], axis = 1)
-                    yerr_temp = yerr_temp.set_index('Concentration').drop(templist, axis = 1)
-                    
-                    if control == True:
-                        control_data = data[data['Type'].str.contains('control') == True]
-                        control_data = control_data[(control_data['Protein'] == pval)].drop(templist + ["Column"], axis = 1)
-
-                        control_time = time[time['Type'].str.contains('control') == True]
-                        control_time = control_time[(control_time['Protein'] == pval)].drop(templist + ["Column"], axis = 1)
-                    
-                    # stops empty rows being plotted
-                    if (pval != 'none') & (cval != 'none'):
-
-                        fig, ax = plt.subplots(dpi = 120)
-
-#                         # control 
-#                         if control == True:
-#                             ctrl_label = "{} (control)".format(data['Contents'][(data['Type'] == 'control') & (data['Protein'] == pval)].unique()[0])
-#                             ax.plot(control_time.iloc[0], control_data.iloc[0], '-o', color = 'black', mfc = 'white', lw = 1, zorder = 2, 
-#                                     label = ctrl_label)
-
-#                     plot series, iterating down rows
-                        for i in range(len(time_temp)):
-                            if error == True:
-                                ax.errorbar(x = time_temp.iloc[i], y = data_temp.iloc[i], yerr = yerr_temp.iloc[i],
-                                           capsize = 3, zorder=1, color = cal.plot_color(data_temp, cmap, i),
-                                           label = "{}".format(data_temp.index[i]))
-                            else: 
-                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], '-o', zorder=1, label = "{} {}".format(data_temp.index[i], index['Concentration Units'].iloc[i]),
-                                       ms = 5, color = cal.plot_color(data_temp, cmap, i))
-
-                            # add legend    
-                            ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{} {}".format(pval, cval))
-
-                        # white background makes the exported figure look a lot nicer
-                        fig.patch.set_facecolor('white')
-
-                        # spines
-                        ax.spines['right'].set_visible(False)
-                        ax.spines['top'].set_visible(False)
-
-                        # add line representing the activator
-                        times = self.data['baseline_corrected']['grouped']['time'].drop(['Column', 'Valid'], axis = 1).mean()
-                        # get times
-                        time_filter = times > (self.inject - 5) # mean time series that contains activator
-
-                        # get start and end points
-                        injection_start = times[time_filter].iloc[0]
-                        injection_end = times[time_filter].iloc[-1]
-
-                        # add line indicating presence of activator
-                        ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash w/ data
-                        ax.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
-
-                        # activator title
-                        ax.text((injection_start+injection_end)/2, (ymax+ymax*0.05), activator, ha = 'center')
-
-                        # assay title
-                        ax.set_title(title, x = 0, fontweight = '550')
-
-                        # axes labels
-                        ax.set_xlabel("time (s)")
-                        ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-
-                        if show_window == True:
-                            # x min and x max for axvspan 
-                            xmin = time_temp.loc[:, self.window[0]].mean()
-                            xmax = time_temp.loc[:, self.window[1]].mean()
-                            ax.axvspan(xmin, xmax, facecolor = window_color, alpha = 0.5)
-
-                    plt.show()
+            return self.data['mean_amplitudes']
+    # define plot fitting/plotting from calcium_flex:
+    
+    def plot_curve(self, plot_func, combine_plates = False, combine = False, plate_number = True, activator = "", use_normalised = False, type_to_plot = 'compound', title = '', dpi = 120, n = 5, proteins = [], compounds = [], **kwargs):
+        """Plots fitted curve, for either each plate or a combined plot using logistic regression with errors and IC50/EC50 values.
+        
+        :param plot_func: Plot function to use, either ic50 or ec50
+        :type plot_func: str
+        :param combine_plates: Combines all plots across all plates onto the same graph, default = False
+        :type combine_plates = bool
+        :param combine: Combines different proteins and compounds on same plate to the same plot, default = False
+        :type combine: bool
+        :param activator: Activator injected into assay, default = ""
+        :type activator: str
+        :param use_normalised: If True, uses normalised amplitudes, default = False
+        :type use_normalised: bool
+        :param type_to_plot: Type of condition to plot, default = 'compound'
+        :type type_to_plot: str
+        :param title: Choose between automatic title or insert string to use, default = 'auto'
+        :type title: str
+        :param dpi: Size of figure
+        :type dpi: int
+        :param n: Number of concentrations required for plot
+        :type n: int
+        :param proteins: Proteins to plot, defaults to all
+        :type proteins: list
+        :param compounds: Compounds to plot, defaults to all
+        :type compounds: list
+        :param **kwargs: Additional curve fitting arguments
+        :return: Figure with fitted dose-response curve
+        :rtype: fig
+        """
+        for key, val in enumerate(self.caflexplates):
+            if combine_plates = False:
+                # sort titles
+                if plate_number == True: # show 
+                    if title == "":
+                        Title = "Plate {}\n{}".format(key+1, val.title)
+                    else:
+                        Title = "Plate {}\n{}".format(key+1, title)
+                else:
+                    if title == "":
+                        Title = val.title
+                val.plot_curve(plot_func, combine, activator, use_normalised, type_to_plot, title, dpi, n, proteins, compounds, **kwargs)
+            else: # combine all curves onto the same figure.
+                
