@@ -571,14 +571,14 @@ class CaFlexPlate:
         self.processed_data['plateau']['data_normed'] = ((amps * 100) / control_amp).rename(columns = {'Amplitude':'amps_normed'})
 
         return self.processed_data['plateau']['data_normed']
-            
-    def _get_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs):
-        """Updates self.plot_data with data required for a fitted plot of IC50's or EC50's."""
+    
+    @staticmethod
+    def _gen_curve_data(mean_amps, plot_func, use_normalised, n, proteins, compounds, **kwargs):
+        """Generates data required for a fitted plot of IC50's or EC50's."""
         
-        self.curve_data = {}
-        
-        table = self.mean_amplitude(use_normalised)
-        amps = table[table.Type == 'compound']
+        curve_data = {}
+        # filter amps 
+        amps = mean_amps[mean_amps.Type == 'compound']
         
         # get names of proteins
         if proteins == []:
@@ -610,12 +610,22 @@ class CaFlexPlate:
                 popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs) 
 
                 # update curve_data dict
-                self.curve_data["{}_{}".format(pval, cval)] = {'x':x, 'y':y, 'yerr':yerr, 'c50units':c50units, 'compound':cval, 
+                curve_data["{}_{}".format(pval, cval)] = {'x':x, 'y':y, 'yerr':yerr, 'c50units':c50units, 'compound':cval, 
                                                           'protein':pval, 'popt':popt}
-        return self.curve_data
+        return curve_data  
+        
+    def _get_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs): 
+        """Updates and returns self.plot_data with data required for a fitted plot of IC50's or EC50's."""
+        mean_amps = self.mean_amplitude(use_normalised)
+        
+        curve_data = self._gen_curve_data(mean_amps, plot_func, use_normalised, n, proteins, compounds, **kwargs)
+        
+        self.plot_data = curve_data
+        
+        return self.plot_data
         
     @staticmethod
-    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, **kwargs):
+    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi):
         
         legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
         if combine == True:
@@ -720,5 +730,5 @@ class CaFlexPlate:
         curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
         
         # do plots
-        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, **kwargs)
+        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi)
         
