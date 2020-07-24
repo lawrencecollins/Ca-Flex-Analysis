@@ -570,12 +570,10 @@ class CaFlexPlate:
         self.processed_data['plateau']['data_normed'] = "test"
         self.processed_data['plateau']['data_normed'] = ((amps * 100) / control_amp).rename(columns = {'Amplitude':'amps_normed'})
 
-
         return self.processed_data['plateau']['data_normed']
             
     def _get_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs):
         """Updates self.plot_data with data required for a fitted plot of IC50's or EC50's."""
-        
         
         self.curve_data = {}
         
@@ -615,34 +613,11 @@ class CaFlexPlate:
                 self.curve_data["{}_{}".format(pval, cval)] = {'x':x, 'y':y, 'yerr':yerr, 'c50units':c50units, 'compound':cval, 
                                                           'protein':pval, 'popt':popt}
         return self.curve_data
-            
-    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, **kwargs):
-        """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
-        :param plot_func: Plot function to use, either ic50 or ec50
-        :type plot_func: str
-        :param use_normalised: If True, uses normalised amplitudes, default = False
-        :type use_normalised: bool
-        :param n: Number of concentrations required for plot
-        :type n: int
-        :param proteins: Proteins to plot, defaults to all
-        :type proteins: list
-        :param compounds: Compounds to plot, defaults to all
-        :type compounds: list
-        :param activator: Activator injected into assay, default = " "
-        :type activator: str
-        :param title: Choose between automatic title or insert string to use, default = " "
-        :type title: str
-        :param dpi: Size of figure
-        :type dpi: int
-        :param **kwargs: Additional curve fitting arguments
-        """         
+    @staticmethod
+    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, **kwargs):
         
         legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
-        
-        # get curve data        
-        curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
-        
         if combine == True:
             fig, ax = plt.subplots(dpi = dpi)
         
@@ -719,3 +694,31 @@ class CaFlexPlate:
             leg = ax.legend(loc = 'best', frameon = False,framealpha=0.7)
         
         plt.show()
+        
+        
+    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, **kwargs):
+        """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
+        
+        :param plot_func: Plot function to use, either ic50 or ec50
+        :type plot_func: str
+        :param use_normalised: If True, uses normalised amplitudes, default = False
+        :type use_normalised: bool
+        :param n: Number of concentrations required for plot
+        :type n: int
+        :param proteins: Proteins to plot, defaults to all
+        :type proteins: list
+        :param compounds: Compounds to plot, defaults to all
+        :type compounds: list
+        :param activator: Activator injected into assay, default = " "
+        :type activator: str
+        :param title: Choose between automatic title or insert string to use, default = " "
+        :type title: str
+        :param dpi: Size of figure
+        :type dpi: int
+        :param **kwargs: Additional curve fitting arguments
+        """         
+        curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
+        
+        # do plots
+        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, **kwargs)
+        
