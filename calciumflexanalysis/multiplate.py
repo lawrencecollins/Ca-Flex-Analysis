@@ -312,7 +312,7 @@ class CaFlexGroup:
         return self.plot_data
     
     
-    def plot_curve(self, plot_func, combine_plates = False, combine = False, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", **kwargs):
+    def plot_curve(self, plot_func, combine_plates = False, combine = False, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", show_top_bot = False, **kwargs):
         """Plots fitted curve, for either each plate or a combined plot using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -337,6 +337,8 @@ class CaFlexGroup:
         :type proteins: list
         :param compounds: Compounds to plot, defaults to all
         :type compounds: list
+        :param show_top_bot: 'True' shows the top and bottom curve fitting values in the legend
+        :type show_top_bot: bool
         :param **kwargs: Additional curve fitting arguments
         :return: Figure with fitted dose-response curve
         :rtype: fig
@@ -344,12 +346,12 @@ class CaFlexGroup:
         # plot each plate separately (combine can be on or off)
         if combine_plates == False:
             for key, val in enumerate(self.caflexplates):
-                val.plot_curve(plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, **kwargs) # update with type_to_plot
+                val.plot_curve(plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, **kwargs) # update with type_to_plot
             
         # combine data from all plates (combine can still separate proteins/compounds)
         if combine_plates == True:
             curve_data = self.collect_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
             
             # use static method in calcium_flex to plot
-            cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi)
+            cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot)
     
