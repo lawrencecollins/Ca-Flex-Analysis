@@ -378,7 +378,7 @@ class CaFlexPlate:
         index = np.array(list(data_source['data'].columns))[window_filter]
         self.window =  (index[0], index[10])
         
-    def plot_conditions(self, data_type, activator = " ", show_window = False, dpi = 120, title = " ", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = []):
+    def plot_conditions(self, data_type, activator = " ", show_window = False, dpi = 120, title = " ", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = [], marker = '-o'):
         """Plots each mean condition versus time.
         
         :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
@@ -399,6 +399,8 @@ class CaFlexPlate:
         :type cmap: str
         :param window_color: Color of the plateau window, default = 'hotpink'
         :type window_color: str
+        :param marker: Marker type, default = '-o'
+        :type marker: str
         :return: Figure displaying each mean condition versus time
         :rtype: fig
         """
@@ -463,7 +465,7 @@ class CaFlexPlate:
                     # control 
                     if control == True:
                         ctrl_label = "{} (control)".format(platemap['Contents'][(platemap['Type'] == 'control') & (platemap['Protein'] == pval)].unique()[0])
-                        ax.plot(control_time.iloc[0], control_data.iloc[0], '-o', color = 'black', mfc = 'white', lw = 1, zorder = 2, 
+                        ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', mfc = 'white', lw = 1, zorder = 2, 
                                 label = ctrl_label)
 
                 # plot series, iterating down rows
@@ -473,7 +475,7 @@ class CaFlexPlate:
                                        capsize = 3, zorder=1, color = plot_color(data_temp, cmap, i),
                                        label = "{}".format(data_temp.index[i]))
                         else: 
-                            ax.plot(time_temp.iloc[i], data_temp.iloc[i], '-o', zorder=1, label = "{} {}".format(data_temp.index[i], index['Concentration Units'].iloc[i]),
+                            ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker, zorder=1, label = "{} {}".format(data_temp.index[i], index['Concentration Units'].iloc[i]),
                                    ms = 5, color = plot_color(data_temp, cmap, i))
 
                         # add legend    
@@ -625,7 +627,7 @@ class CaFlexPlate:
         return self.plot_data
         
     @staticmethod
-    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi):
+    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot):
         
         legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
         if combine == True:
@@ -642,6 +644,9 @@ class CaFlexPlate:
             popt = val['popt']
             protein = val['protein']
             compound = val['compound']
+            tb_str = ""
+            if show_top_bot == True:
+                tb_str = "\nTop = {:.2f}\nBottom = {:.2f}".format(popt[0], popt[1])
             
             # get x and y fits
             fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300)
@@ -650,7 +655,7 @@ class CaFlexPlate:
             # TRUE
             if combine == True:
                 # get label for legend
-                label = r"$\bf{}\ {}$".format(protein, compound) +"\n{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3]) 
+                label = r"$\bf{}\ {}$".format(protein, compound) +"\n{} = {:.2f} {}\nHill Slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
 
                 # plot fit
                 ax.plot(fit_x, fit, lw = 1.2, label = label, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
@@ -661,7 +666,7 @@ class CaFlexPlate:
             # FALSE        
             if combine == False:
                 # get label for legend
-                label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3]) 
+                label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
 
                 # plot fit
                 ax.plot(fit_x, fit, lw = 1.2, label = label, color = 'black')
@@ -695,9 +700,11 @@ class CaFlexPlate:
             
             # title
             ax.set_title(title, x = 0, fontweight = '550')
+            
+            plt.minorticks_off()
         ###################################### end of plotting loop ##########################        
         # post loop mods
-        plt.minorticks_off()
+        
         
         # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
         if combine == True:
@@ -706,7 +713,7 @@ class CaFlexPlate:
         plt.show()
         
         
-    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, **kwargs):
+    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, show_top_bot = False, **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -719,16 +726,22 @@ class CaFlexPlate:
         :type proteins: list
         :param compounds: Compounds to plot, defaults to all
         :type compounds: list
+        :param error_bar: If True, reveals error bars, default = True
+        :type error_bar = bool
+        :param cmap: Color map that sets each line colour in a combined plot, default = "Dark2"
+        :type cmap: bool
         :param activator: Activator injected into assay, default = " "
         :type activator: str
         :param title: Choose between automatic title or insert string to use, default = " "
         :type title: str
         :param dpi: Size of figure
         :type dpi: int
+        :param show_top_bot: 'True' shows the top and bottom curve fitting values in the legend
+        :type show_top_bot: bool
         :param **kwargs: Additional curve fitting arguments
         """         
         curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
         
         # do plots
-        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi)
+        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot)
         
