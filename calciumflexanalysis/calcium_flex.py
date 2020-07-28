@@ -569,7 +569,7 @@ class CaFlexPlate:
         return mean_response
     
     def normalise(self):
-        """Normalises amplitudes to mean control amplitude"""
+        """Normalises amplitudes to mean control amplitude."""
         mean_amps = self.mean_amplitude(use_normalised = False) # get mean control amplitude
         amps = self.processed_data['plateau']['data']
         control_amp = float(mean_amps[mean_amps['Type'] == 'control']['Amplitude'])
@@ -588,15 +588,15 @@ class CaFlexPlate:
         
         # get names of proteins
         if proteins == []:
-            proteins = amps['Protein'].unique()
+            prots = amps['Protein'].unique()
             
         # separate proteins 
-        for pkey, pval in enumerate(proteins):
+        for pkey, pval in enumerate(prots):
             # get compounds for each proteins
             if compounds == []:
-                compounds = amps[amps['Protein'] == pval]['Compound'].unique()
+                comps = amps[amps['Protein'] == pval]['Compound'].unique()
             # get number of compounds for each protein
-            for ckey, cval in enumerate(compounds):
+            for ckey, cval in enumerate(comps):
                 # filter dataframe for each compound in each protein
                 temp = amps[(amps['Protein'] == pval) & (amps['Compound'] == cval)]
                 # check there is only 1 conc unit
@@ -607,9 +607,9 @@ class CaFlexPlate:
                     raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), pval, cval, n))
 
                 # get x, y and error values, c50 units, compound and protein names to use for plot
-                x = temp['Concentration']
-                y = temp.iloc[:, -2]
-                yerr = temp.iloc[:, -1]
+                x = temp['Concentration'].to_numpy()
+                y = temp.iloc[:, -2].to_numpy()
+                yerr = temp.iloc[:, -1].to_numpy()
                 c50units = temp['Concentration Units'].unique()[0]
 
                 # get popt values for logistic regression
@@ -713,7 +713,7 @@ class CaFlexPlate:
         # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
         if combine == True:
             leg = ax.legend(loc = 'best', frameon = False,framealpha=0.7)
-        
+            ax.set_xlabel("Concentration")
         plt.show()
         
         
