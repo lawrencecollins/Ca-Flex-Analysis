@@ -497,7 +497,11 @@ class CaFlexPlate:
                     injection_end = times[time_filter].iloc[-1]
 
                     # add line indicating presence of activator
-                    ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash w/ data
+                    if control_data.max().max() > data_temp.max().max():
+                        ymax = control_data.max().max() + control_data.max().max()*0.1
+                    else:
+                        ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash w/ data
+                        
                     ax.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
 
                     # activator title
