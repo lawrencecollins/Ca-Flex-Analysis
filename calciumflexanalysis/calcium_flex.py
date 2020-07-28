@@ -712,7 +712,7 @@ class CaFlexPlate:
         
         # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
         if combine == True:
-            leg = ax.legend(loc = 'best', frameon = False,framealpha=0.7)
+            leg = ax.legend(loc = 'center left', frameon = False, bbox_to_anchor = [1.0, 0.5])
             ax.set_xlabel("Concentration")
         plt.show()
         

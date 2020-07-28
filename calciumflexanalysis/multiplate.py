@@ -348,7 +348,7 @@ class CaFlexGroup:
     def collate_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs):
         """Updates self.plot_data with the data from all the plates."""
         
-        mean_amps = self.data['mean_amplitudes']
+        mean_amps = self.mean_amplitude(combine = True, use_normalised = use_normalised)
         # use static method in calcium_flex to get curve_data
         curve_data = cal.CaFlexPlate._gen_curve_data(mean_amps, plot_func, use_normalised, n, proteins, compounds, **kwargs)
         
