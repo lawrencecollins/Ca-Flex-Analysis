@@ -61,7 +61,9 @@ class CaFlexGroup:
         plates = self.caflexplates
         for key, val in enumerate(plates):
             if title == "":
-                title = "Plate {}\n{}".format(key+1, val.title)
+                Title = "Plate {}\n{}".format(key+1, val.title)
+            else:
+                Title = "Plate {}\n{}".format(key+1, title)
             val.visualise_assay(share_y, export, title, colormap, colorby, labelby, dpi)
             
     def see_plates(self, title = "", export = False, colormap = 'Paired', colorby = 'Type', labelby = 'Type', dpi = 100):
@@ -88,8 +90,10 @@ class CaFlexGroup:
         plates = self.caflexplates
         for key, val in enumerate(plates):
             if title == "":
-                title = "Plate {}\n{}".format(key+1, val.title)
-            val.see_plate(title, export, colormap, colorby, labelby, dpi)
+                Title = "Plate {}\n{}".format(key+1, val.title)
+            else:
+                Title = "Plate {}\n{}".format(key+1, title)
+            val.see_plate(Title, export, colormap, colorby, labelby, dpi)
             
     def baseline_correct(self):
         """Baseline corrects 'ratio' data for each well using the pre-injection time points."""
@@ -222,31 +226,52 @@ class CaFlexGroup:
         """
         grouplist = self.grouplist
         
-        if combine == False: 
-            for key, val in enumerate(self.caflexplates):
-                # sort titles
-                if plate_number == True: # show 
-                    if title == "":
-                        Title = "Plate {}\n{}".format(key+1, val.title)
-                    else:
-                        Title = "Plate {}\n{}".format(key+1, title)
+         
+        for key, val in enumerate(self.caflexplates):
+            # sort titles
+            if plate_number == True: # show 
+                if title == "":
+                    Title = "Plate {}\n{}".format(key+1, val.title)
                 else:
-                    if title == "":
-                        Title = val.title
-                val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
+                    Title = "Plate {}\n{}".format(key+1, title)
+            else:
+                if title == "":
+                    Title = val.title
+            val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
                 
     def amplitude(self, data_type):
-        """Calculates response amplitude for each condition, for either each plate or across all plates.
+        """Calculates response amplitude for each condition, for each plate.
+        
+        Don't worry about specifying whether you want to collate data yet - it'll do both.
         
         :param data_type: Data to use to calculate amplitudes, either 'ratio' or 'baseline_corrected'
         :type data_type: str
-        :param combine: Generate amplitudes for each plate or across all plates, default = False
-        :type combine: bool
+        
         """
-
         for key, val in enumerate(self.caflexplates):
             val.amplitude(data_type)
             print("self.processed_data['plateau']['data'] updated for plate {}.".format(key+1))
+            
+        # collate data processed data from all plates and update self.data
+        self.group_data(data_type)
+        amp = self.data[data_type]['grouped']['data'].iloc[:, self.window[0]:self.window[1]].to_numpy()
+        # easiest means to do this is to just calculate the means again - keeps everything in the same order. 
+        amp_mean = np.mean(amp, axis = 1)
+        plateaus = pd.DataFrame(amp_mean, columns = ['Amplitude'], index = self.data[data_type]['grouped']['data'].index)
+        
+        # get plate map info
+        cols = self.data[data_type]['grouped']['data'].columns
+        cols_fltr = [i for i in cols if type(i) == str] # extract plate infor excluding data
+        grouped_map = self.data[data_type]['grouped']['data'][cols_fltr]
+        self.data['plateau'] = {} 
+        
+        # merge plate map details with amps
+        self.data['plateau']['data'] = grouped_map.join(plateaus) 
+        
+        return self.data['plateau']['data']
+        
+        print("self.data['plateau']['data'] updated")
+        
                 
     def mean_amplitude(self, use_normalised = False, combine = False):
         """Returns mean amplitudes and error for each condition, for either each plate or across all plates.
@@ -262,7 +287,6 @@ class CaFlexGroup:
         """
         # check data_type == 'ratio' or 'baseline_corrected'
         self.data['mean_amplitudes'] = {}
-        lst = []
         
         if combine == False:
             for key, val in enumerate(self.caflexplates):
@@ -271,20 +295,15 @@ class CaFlexGroup:
                 print("self.data['mean_ampltitudes'][{}] updated".format(key))
                 
         if combine == True:
-            for key, val in enumerate(self.caflexplates):
-                # combine ampltitude data for each plate with its corresponding plate map
-                mapped = val.plate_map.fillna(-1).join(val.processed_data['plateau']['data'])
-                if use_normalised == True :
-                    # get normalised data if specified
-                    mapped = val.plate_map.fillna(-1).join(val.processed_data['plateau']['data_normed'])
-                # collect resulting dataframes    
-                lst.append(mapped)
-            # concatenate resulting dataframes        
-            mapped = pd.concat(lst)
-            # get only valid wells
-            group = mapped[mapped.Valid == True]
-            # drop columns which cause errors w/ grouby operations
+            if use_normalised == False:
+                group = self.data['plateau']['data']
+            else:
+                group = self.data['plateau']['data_normed'] # UPDATE NORMALISE FOR COMBINE
+            # get valid data
+            group = group[group.Valid == True]
+            # drop cols which cause errors w/ groupby operations
             group.drop(['Valid', 'Column'], axis = 1, inplace = True)
+            
             # get mean amps for each condition across all plates
             mean_response = group.groupby(self.grouplist).mean().reset_index()
             # get errors
@@ -299,11 +318,37 @@ class CaFlexGroup:
 
             return self.data['mean_amplitudes']
     
+    def normalise(self, combine = False):
+        """Normalises amplitudes to mean control amplitude. 
+        
+        If combine = True, normalises to the mean control amplitude across all the plates. Updates either each caflexplate object or the caflexgroup object.
+        
+        :param combine: If true, normalises the response amplitudes to the mean control across all the plates
+        :type combine: bool
+        """
+        if combine == False:
+            for key, val in enumerate(self.caflexplates):
+                val.normalise()
+                print("Plate {} normalised".format(key+1))
+                
+        if combine == True:
+            # get mean control amplitude
+            mean_amps = self.mean_amplitude(use_normalised = False, combine = True)
+            amps = self.data['plateau']['data']['Amplitude']
+            control_amp = mean_amps[mean_amps['Type'] == 'control']['Amplitude'].mean()
+            # get plate map infor for every well across every plate
+            platemap = self.data['plateau']['data'].loc[:, 'Well ID': 'Valid']
+            # normalise to mean control
+            normed = ((amps*100) / control_amp).to_frame().rename(columns = {'Amplitude':'amps_normed'})
+            # update self.data
+            self.data['plateau']['data_normed'] = platemap.join(normed)
+            print("Collated data normalised to mean control. See self.data['plateau']['data_normed']")
+            return self.data['plateau']['data_normed']
     
-    def collect_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs):
+    def collate_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs):
         """Updates self.plot_data with the data from all the plates."""
         
-        mean_amps = self.mean_amplitude(combine = True)
+        mean_amps = self.data['mean_amplitudes']
         # use static method in calcium_flex to get curve_data
         curve_data = cal.CaFlexPlate._gen_curve_data(mean_amps, plot_func, use_normalised, n, proteins, compounds, **kwargs)
         
@@ -350,7 +395,7 @@ class CaFlexGroup:
             
         # combine data from all plates (combine can still separate proteins/compounds)
         if combine_plates == True:
-            curve_data = self.collect_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
+            curve_data = self.collate_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
             
             # use static method in calcium_flex to plot
             cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot)
