@@ -1,18 +1,18 @@
 Experiment Title:,,14052019 C5sYFP2 IBP21 inhib 300nM to 0.3 nM,,,,,,
 Row,Start,End,Type,Contents,Compound,Protein,Concentration,Concentration Units
 A,1,6,Blank,DMSO,,,,
-B,1,6,Control,EA (30 nM)+DMSO,EA,EA [30],,nM
-C,1,6,Compound,EA(30 nM) +IBP21 (300 nM),IBP21,EA [30],300,nM
-D,1,6,Compound,EA(30 nM) +IBP21 (100 nM),IBP21,EA [30],100,nM
-E,1,6,Compound,EA(30 nM) +IBP21 (30 nM),IBP21,EA [30],30,nM
- F,1,6,Compound,EA(30 nM) +IBP21 (10 nM),IBP21,EA [30],10,nM
-G,1,6,Compound,EA(30 nM) +IBP21 (3 nM),IBP21,EA [30],3,nM
-H,1,6,Compound,EA(30 nM) +IBP21 (1 nM),IBP21,EA [30],1,nM
+B,1,6,Control,EA (30 nM)+DMSO,EA,TRPC5,,nM
+C,1,6,Compound,EA(30 nM) +IBP21 (300 nM),IBP21,TRPC5,300,nM
+D,1,6,Compound,EA(30 nM) +IBP21 (100 nM),IBP21,TRPC5,100,nM
+E,1,6,Compound,EA(30 nM) +IBP21 (30 nM),IBP21,TRPC5,30,nM
+ F,1,6,Compound,EA(30 nM) +IBP21 (10 nM),IBP21,TRPC5,10,nM
+G,1,6,Compound,EA(30 nM) +IBP21 (3 nM),IBP21,TRPC5,3,nM
+H,1,6,Compound,EA(30 nM) +IBP21 (1 nM),IBP21,TRPC5,1,nM
 A,7,12,Blank,DMSO,,,,
-B,7,12,Control,EA (30 nM)+DMSO,EA,EA [30],,nM
-C,7,12,Compound,EA(30 nM) +IBP23 (300 nM),IBP23,EA [30],300,nM
-D,7,12,Compound,EA(30 nM) +IBP23 (100 nM),IBP23,EA [30],100,nM
-E,7,12,Compound,EA(30 nM) +IBP23 (30 nM),IBP23,EA [30],30,nM
- F,7,12,Compound,EA(30 nM) +IBP23 (10 nM),IBP23,EA [30],10,nM
-G,7,12,Compound,EA(30 nM) +IBP23 (3 nM),IBP23,EA [30],3,nM
-H,7,12,Compound,EA(30 nM) +IBP23 (1 nM),IBP23,EA [30],1,nM
+B,7,12,Control,EA (30 nM)+DMSO,EA,TRPC5,,nM
+C,7,12,Compound,EA(30 nM) +IBP23 (300 nM),IBP23,TRPC5,300,nM
+D,7,12,Compound,EA(30 nM) +IBP23 (100 nM),IBP23,TRPC5,100,nM
+E,7,12,Compound,EA(30 nM) +IBP23 (30 nM),IBP23,TRPC5,30,nM
+ F,7,12,Compound,EA(30 nM) +IBP23 (10 nM),IBP23,TRPC5,10,nM
+G,7,12,Compound,EA(30 nM) +IBP23 (3 nM),IBP23,TRPC5,3,nM
+H,7,12,Compound,EA(30 nM) +IBP23 (1 nM),IBP23,TRPC5,1,nM
