@@ -273,7 +273,7 @@ class CaFlexGroup:
         print("self.data['plateau']['data'] updated")
         
                 
-    def mean_amplitude(self, use_normalised = False, combine = False):
+    def mean_amplitude(self, use_normalised = False, combine = True):
         """Returns mean amplitudes and error for each condition, for either each plate or across all plates.
         
         The user must run the normalise method before attempting to get the mean amplitudes of the normalised amplitudes.
@@ -318,7 +318,7 @@ class CaFlexGroup:
 
             return self.data['mean_amplitudes']
     
-    def normalise(self, combine = False):
+    def normalise(self, combine = True):
         """Normalises amplitudes to mean control amplitude. 
         
         If combine = True, normalises to the mean control amplitude across all the plates. Updates either each caflexplate object or the caflexgroup object.
@@ -357,7 +357,7 @@ class CaFlexGroup:
         return self.plot_data
     
     
-    def plot_curve(self, plot_func, combine_plates = False, combine = False, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", show_top_bot = False, **kwargs):
+    def plot_curve(self, plot_func, combine_plates = False, combine = True, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", show_top_bot = False, **kwargs):
         """Plots fitted curve, for either each plate or a combined plot using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
