@@ -589,7 +589,8 @@ class CaFlexPlate:
         # get names of proteins
         if proteins == []:
             prots = amps['Protein'].unique()
-        else prots = proteins
+        else:
+            prots = proteins
         # separate proteins 
         for pkey, pval in enumerate(prots):
             # get compounds for each proteins
