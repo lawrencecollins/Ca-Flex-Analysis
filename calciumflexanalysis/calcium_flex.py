@@ -320,8 +320,10 @@ class CaFlexPlate:
         if type(to_plot) == str:
             # plot individual well:
             try:
+                label = self.plate_map.loc[to_plot][labelby]
+                
                 fig, ax = plt.subplots()
-                ax.plot(self.processed_data['ratio']['time'].loc[to_plot], self.processed_data['ratio']['data'].loc[to_plot], lw = 3, color = 'black', label = pm.labelwell(self.plate_map, labelby, 0))
+                ax.plot(self.processed_data['ratio']['time'].loc[to_plot], self.processed_data['ratio']['data'].loc[to_plot], lw = 3, color = 'black', label = "{} {}".format(to_plot, label))
 
             # add label for each well
                 ax.legend(loc = 'best', frameon = True, fancybox = True)
@@ -341,13 +343,14 @@ class CaFlexPlate:
 
             for i in range(len(to_plot)):
                 try:
+                    label =  label = self.plate_map.loc[to_plot[i]][labelby] 
                     axs[i].plot(self.processed_data['ratio']['time'].loc[to_plot[i]], self.processed_data['ratio']['data'].loc[to_plot[i]], 
                                 lw = 3, color = pm.wellcolour2(self.plate_map, colorby, cmap, i, to_plot), 
-                               label = pm.labelwell(self.plate_map, labelby, i))
+                               label = "{} {}".format(to_plot[i], label))
 
                 # add label for each well
                     axs[i].legend(loc = 'best', frameon = True, fancybox = True)
-                    axs[i].set_title("{} {}".format(to_plot[i], pm.labelwell(self.plate_map, labelby, i)))
+                    axs[i].set_title("{} {}".format(to_plot[i], label))
                     axs[i].set_facecolor('0.95')
                     axs[i].set_xlabel("time / s")
                     axs[i].set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
