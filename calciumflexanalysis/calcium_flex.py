@@ -92,6 +92,7 @@ class CaFlexPlate:
     :type skipfooter: int
     """
     def __init__(self, raw_data, plate_map_file, inject, map_type = 'short', data_type = 'old', valid = True, size = 96, title = "", skiprows = 2, skipfooter = 3):
+        
         self.raw_data = raw_data
         self.plate_map_file = plate_map_file
         self.inject = inject
@@ -106,7 +107,6 @@ class CaFlexPlate:
         self.grouplist = ['Protein','Type', 'Compound','Concentration', 'Concentration Units']
         
         # invalidate all wells if valid = False
-        print(self.skiprows)
         if self.valid == False:
             self.plate_map['Valid'] = valid
         if self.valid == True:
@@ -120,24 +120,20 @@ class CaFlexPlate:
             
         # check params
         if wells.get(self.size) == None:
-            raise pm.PlateMapError("Invalid size.")
-        
-        
+            raise pm.PlateMapError("Invalid size. Try 6, 12, 24, 48, 96 or 384.")
+            
+        print("Uploaded!")
         
     def _give_platemap(self):
         """Returns platemap dataframe."""
-#         try:
         if self.map_type == 'short':
              platemap = pm.short_map(self.plate_map_file, size = self.size, valid = self.valid)
         elif self.map_type == 'long':
             platemap = pm.plate_map(self.plate_map_file, size = self.size, valid = self.valid)
         else:
-            raise pm.PlateMapError("Invalid map type.")
+            raise pm.PlateMapError("Invalid map type. Try 'short' or 'long'.")
         return platemap
         
-#         except pm.PlateMapError:
-#             pass
-    
     def _data_processed(self):
         """Returns a timemap and datamap as a tuple."""
         if self.data_type == 'old':
@@ -227,7 +223,6 @@ class CaFlexPlate:
 
         elif self.data_type not in ('old', 'new'):
             raise DataError("Incorrect data type")
-
             
     def visualise_assay(self, share_y, export = False, title = "", cmap = 'Dark2_r',
              colorby = 'Type', labelby = 'Type', dpi = 200):
@@ -369,7 +364,7 @@ class CaFlexPlate:
         """
         
         self.plate_map = pm.invalidate_wells(self.plate_map, wells = wells, valid = False)
-        
+        print("{} invalidated".format(wells))
         
     def invalidate_rows(self, rows):
         """Invalidates specified rows and updates plate_map
@@ -379,7 +374,7 @@ class CaFlexPlate:
         """
         platemap = pm.invalidate_rows(self.plate_map, rows, valid = False)
         self.plate_map = platemap
-    
+        print("Row {} invalidated".format(rows))
     
     def invalidate_cols(self, cols):
         """Invalidates specified wells and updates plate_map
@@ -389,26 +384,30 @@ class CaFlexPlate:
         """
         platemap = pm.invalidate_cols(self.plate_map, cols, valid = False)
         self.plate_map = platemap
-        
+        print("Columns {} invalidated".format(cols))
         
     def baseline_correct(self):
         """Baseline corrects 'ratio' data using the pre-injection time points."""
-        time_cut = self.inject - 5
-        data_source = self.processed_data['ratio']
-        # convert to numpy arrays
-        time = data_source['time'].to_numpy()
-        data = data_source['data'].to_numpy()
-        # create mask from mean time values
-        time_filter = np.nanmean(time,axis=0)<time_cut
-        # # average over these times
-        baseline = np.mean(data[:,time_filter],axis=1)
-        # add dimension to enable broadcasting
-        baseline = np.expand_dims(baseline, axis=1)
-        # rewrite values back to dataframes
-        self.processed_data['baseline_corrected'] = {}
-        data_source = self.processed_data['baseline_corrected']['data'] = pd.DataFrame(data-baseline, index = data_source['data'].index)
-        data_source = self.processed_data['baseline_corrected']['time'] = data_source = self.processed_data['ratio']['time']
-        
+        try:
+            time_cut = self.inject - 5
+            data_source = self.processed_data['ratio']
+            # convert to numpy arrays
+            time = data_source['time'].to_numpy()
+            data = data_source['data'].to_numpy()
+            # create mask from mean time values
+            time_filter = np.nanmean(time,axis=0)<time_cut
+            # # average over these times
+            baseline = np.mean(data[:,time_filter],axis=1)
+            # add dimension to enable broadcasting
+            baseline = np.expand_dims(baseline, axis=1)
+            # rewrite values back to dataframes
+            self.processed_data['baseline_corrected'] = {}
+            data_source = self.processed_data['baseline_corrected']['data'] = pd.DataFrame(data-baseline, index = data_source['data'].index)
+            data_source = self.processed_data['baseline_corrected']['time'] = data_source = self.processed_data['ratio']['time']
+
+            print("Baseline corrected! See self.processed_data['baseline_corrected']")
+        except:
+            print("baseline correction failed.")
         
     def get_gradients(self, data_type):
         """Returns the mean gradient over every 10 time points post injection.
@@ -636,13 +635,18 @@ class CaFlexPlate:
         :type data_type: str
 
         """
-        # get ampltitude for every condition
-        amp = (self.processed_data[data_type]['data'].iloc[:, self.window[0]:self.window[1]]).to_numpy()
-        # get mean amplitude for every condition
-        amp_mean = np.mean(amp, axis = 1)
-        # update processed_data with response amplitude
-        self.processed_data['plateau'] = {}
-        self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
+        try:
+            # get ampltitude for every condition
+            amp = (self.processed_data[data_type]['data'].iloc[:, self.window[0]:self.window[1]]).to_numpy()
+            # get mean amplitude for every condition
+            amp_mean = np.mean(amp, axis = 1)
+            # update processed_data with response amplitude
+            self.processed_data['plateau'] = {}
+            self.processed_data['plateau']['data'] = pd.DataFrame(amp_mean, index = self.processed_data['ratio']['data'].index, columns = ['Amplitude'])
+
+            print("Amplitudes calculated from {}. See self.processed_data['plateau']['data']".format(data_type))
+        except:
+            print("Ampltitude calculation failed.")
         
     def mean_amplitude(self, use_normalised = False):
         """Returns mean amplitudes and error for each condition.
@@ -833,7 +837,7 @@ class CaFlexPlate:
 
                 plt.minorticks_off()
             except:
-                print("exception")
+                print("Did not plot {}, {}".format(protein, compound))
         ###################################### end of plotting loop ##########################        
         # post loop mods
         

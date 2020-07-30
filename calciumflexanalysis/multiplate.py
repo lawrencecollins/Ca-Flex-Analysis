@@ -93,15 +93,24 @@ class CaFlexGroup:
                 Title = "Plate {}\n{}".format(key+1, val.title)
             else:
                 Title = "Plate {}\n{}".format(key+1, title)
-            val.see_plate(Title, export, colormap, colorby, labelby, dpi)
-            
+            try:
+                val.see_plate(Title, export, colormap, colorby, labelby, dpi)
+            except:
+                print("Check plate {}".format(key+1))
+                
     def baseline_correct(self):
         """Baseline corrects 'ratio' data for each well using the pre-injection time points."""
         self.data['baseline_corrected'] = {}
         for key, val in enumerate(self.caflexplates):
-            val.baseline_correct()
-            self.data['baseline_corrected']["plate_{}".format(key+1)] = val.processed_data['baseline_corrected']
-        print("baseline corrected!")
+            try:
+                val.baseline_correct()
+                print("Plate {}".format(key+1))
+                self.data['baseline_corrected']["plate_{}".format(key+1)] = val.processed_data['baseline_corrected']
+                
+            except:
+                print("Baseline correction for plate {} failed".format(key+1))
+                
+        
         
     def get_window(self, data_type):
         """Finds the lowest overall mean gradient for across the ten time point window post injection for the plates
@@ -228,16 +237,19 @@ class CaFlexGroup:
         
          
         for key, val in enumerate(self.caflexplates):
-            # sort titles
-            if plate_number == True: # show 
-                if title == "":
-                    Title = "Plate {}\n{}".format(key+1, val.title)
+            try:
+                # sort titles
+                if plate_number == True: # show 
+                    if title == "":
+                        Title = "Plate {}\n{}".format(key+1, val.title)
+                    else:
+                        Title = "Plate {}\n{}".format(key+1, title)
                 else:
-                    Title = "Plate {}\n{}".format(key+1, title)
-            else:
-                if title == "":
-                    Title = val.title
-            val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
+                    if title == "":
+                        Title = val.title
+                val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
+            except:
+                print("Plate {} plot failed".format(key+1))
                 
     def amplitude(self, data_type):
         """Calculates response amplitude for each condition, for each plate.
@@ -249,8 +261,11 @@ class CaFlexGroup:
         
         """
         for key, val in enumerate(self.caflexplates):
-            val.amplitude(data_type)
-            print("self.processed_data['plateau']['data'] updated for plate {}.".format(key+1))
+            try:
+                val.amplitude(data_type)
+                print("self.processed_data['plateau']['data'] updated for plate {}.".format(key+1))
+            except:
+                print("Plate {} amplitude calculation failed.".format(key+1))
             
         # collate data processed data from all plates and update self.data
         self.group_data(data_type)
