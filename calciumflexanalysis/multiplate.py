@@ -357,7 +357,7 @@ class CaFlexGroup:
         return self.plot_data
     
     
-    def plot_curve(self, plot_func, combine_plates = False, combine = True, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", show_top_bot = False, **kwargs):
+    def plot_curve(self, plot_func, combine_plates = False, combine = True, plate_number = True, activator = " ", use_normalised = False, type_to_plot = 'compound', title = ' ', dpi = 120, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", show_top_bot = False, conc_units = 'M', **kwargs):
         """Plots fitted curve, for either each plate or a combined plot using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -384,6 +384,8 @@ class CaFlexGroup:
         :type compounds: list
         :param show_top_bot: 'True' shows the top and bottom curve fitting values in the legend
         :type show_top_bot: bool
+        :param conc_units: Units displayed on x axis of graph
+        :type conc_units: str
         :param **kwargs: Additional curve fitting arguments
         :return: Figure with fitted dose-response curve
         :rtype: fig
@@ -398,5 +400,5 @@ class CaFlexGroup:
             curve_data = self.collate_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
             
             # use static method in calcium_flex to plot
-            cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot)
+            cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, conc_units)
     

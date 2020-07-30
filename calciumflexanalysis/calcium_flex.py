@@ -7,6 +7,23 @@ from platemapping import plate_map as pm
 import matplotlib.patches as mpl_patches
 from scipy.optimize import curve_fit
 
+# define custom errors
+
+class Error(Exception):
+    pass
+
+class PlateMapError(Error):
+    pass
+class CompoundNameError(PlateMapError):
+    pass
+class ProteinNameError(PlateMapError):
+    pass
+
+
+
+
+
+
 # define well plate dimensions
 wells = {6:(2, 3), 12:(3, 4), 24:(4, 6), 48:(6, 8), 96:(8, 12), 384:(16, 24)} 
 
@@ -464,9 +481,8 @@ class CaFlexPlate:
 
                     # control 
                     if control == True:
-                        ctrl_label = "{} (control)".format(platemap['Contents'][(platemap['Type'] == 'control') & (platemap['Protein'] == pval)].unique()[0])
-                        ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', mfc = 'white', lw = 1, zorder = 2, 
-                                label = ctrl_label)
+                        ctrl_label = "0 {} (control)".format(platemap['Concentration Units'][(platemap['Type'] == 'control') & (platemap['Protein'] == pval)].unique()[0])
+                        ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', mfc = 'white', lw = 1, zorder = 2, label = ctrl_label)
 
                 # plot series, iterating down rows
                     for i in range(len(time_temp)):
@@ -479,7 +495,7 @@ class CaFlexPlate:
                                    ms = 5, color = plot_color(data_temp, cmap, i))
 
                         # add legend    
-                        ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{} {}".format(pval, cval))
+                        ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{}".format(cval))
 
                     # white background makes the exported figure look a lot nicer
                     fig.patch.set_facecolor('white')
@@ -581,44 +597,58 @@ class CaFlexPlate:
     @staticmethod
     def _gen_curve_data(mean_amps, plot_func, use_normalised, n, proteins, compounds, **kwargs):
         """Generates data required for a fitted plot of IC50's or EC50's."""
-        
+        # check proteins and compounds 
+            
         curve_data = {}
         # filter amps 
         amps = mean_amps[mean_amps.Type == 'compound']
         
         # get names of proteins
         if proteins == []:
-            prots = amps['Protein'].unique()
+            prots = list(amps['Protein'].unique())
         else:
             prots = proteins
         # separate proteins 
         for pkey, pval in enumerate(prots):
-            # get compounds for each proteins
-            if compounds == []:
-                comps = amps[amps['Protein'] == pval]['Compound'].unique()
-            # get number of compounds for each protein
-            for ckey, cval in enumerate(comps):
-                # filter dataframe for each compound in each protein
-                temp = amps[(amps['Protein'] == pval) & (amps['Compound'] == cval)]
-                # check there is only 1 conc unit
-                if len(temp['Concentration Units'].unique()) > 1:
-                    raise ValueError["One unit per condition please!"]
-                    # check there is an adequate number of concs
-                if len(temp['Concentration']) < n:
-                    raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), pval, cval, n))
+            try:
+                # check protein
+                if mean_amps['Protein'].str.contains(pval, regex = False).any() == False:
+                    raise ProteinNameError()
+                # get compounds for each proteins
+                if compounds == []:
+                    comps = amps[amps['Protein'] == pval]['Compound'].unique()
+                # get number of compounds for each protein
+                for ckey, cval in enumerate(comps):
+                    # check compound
+                    if mean_amps['Compound'].str.contains(cval, regex = False).any() == False:
+                        raise CompoundNameError()
+                    # filter dataframe for each compound in each protein
+                    temp = amps[(amps['Protein'] == pval) & (amps['Compound'] == cval)]
+                    # check there is only 1 conc unit
+                    if len(temp['Concentration Units'].unique()) > 1:
+                        raise ValueError["One unit per condition please!"]
+                        # check there is an adequate number of concs
+                    if len(temp['Concentration']) < n:
+                        raise ValueError("Not enough concs! You've only got {} for {}, compound {}. You really need at least {} to do a fit.".format(len(temp['Concentration']), pval, cval, n))
 
-                # get x, y and error values, c50 units, compound and protein names to use for plot
-                x = temp['Concentration'].to_numpy()
-                y = temp.iloc[:, -2].to_numpy()
-                yerr = temp.iloc[:, -1].to_numpy()
-                c50units = temp['Concentration Units'].unique()[0]
+                    # get x, y and error values, c50 units, compound and protein names to use for plot
+                    x = temp['Concentration'].to_numpy()
+                    y = temp.iloc[:, -2].to_numpy()
+                    yerr = temp.iloc[:, -1].to_numpy()
+                    c50units = temp['Concentration Units'].unique()[0]
 
-                # get popt values for logistic regression
-                popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs) 
+                    # get popt values for logistic regression
+                    popt, pcov = curve_fit(func_dict[plot_func], x, y, **kwargs) 
 
-                # update curve_data dict
-                curve_data["{}_{}".format(pval, cval)] = {'x':x, 'y':y, 'yerr':yerr, 'c50units':c50units, 'compound':cval, 
-                                                          'protein':pval, 'popt':popt}
+                    # update curve_data dict
+                    curve_data["{}_{}".format(pval, cval)] = {'x':x, 'y':y, 'yerr':yerr, 'c50units':c50units, 'compound':cval, 
+                                                              'protein':pval, 'popt':popt}
+            except CompoundNameError:
+                print("Compound not found. Available compounds are: {}".format(amps['Compound'].unique()))
+
+            except ProteinNameError:
+                print("Protein not found. Available compounds are: {}".format(amps['Protein'].unique()))
+                
         return curve_data  
         
     def _get_curve_data(self, plot_func, use_normalised, n, proteins, compounds, **kwargs): 
@@ -632,81 +662,87 @@ class CaFlexPlate:
         return self.plot_data
         
     @staticmethod
-    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot):
+    def _plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, conc_units):
         
         legend_label = {"ic50":"IC$_{{50}}$", "ec50":"EC$_{{50}}$"}
         if combine == True:
             fig, ax = plt.subplots(dpi = dpi)
         
         for key, val in curve_data.items():
-            if combine == False:
-                fig, ax = plt.subplots(dpi = dpi)
-            # unpack curve_data:
-            x = val['x']
-            y = val['y']
-            yerr = val['yerr']
-            c50units = val['c50units']
-            popt = val['popt']
-            protein = val['protein']
-            compound = val['compound']
-            tb_str = ""
-            if show_top_bot == True:
-                tb_str = "\nTop = {:.2f}\nBottom = {:.2f}".format(popt[0], popt[1])
             
-            # get x and y fits
-            fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300)
-            fit = func_dict[plot_func](fit_x, *popt)
-            ############################# types of plot: combine True OR False ####################
-            # TRUE
-            if combine == True:
-                # get label for legend
-                label = r"$\bf{}\ {}$".format(protein, compound) +"\n{} = {:.2f} {}\nHill Slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
-
-                # plot fit
-                ax.plot(fit_x, fit, lw = 1.2, label = label, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
-
-                # plot errors
-                if error_bar == True:
-                    ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
-            # FALSE        
-            if combine == False:
-                # get label for legend
-                label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
-
-                # plot fit
-                ax.plot(fit_x, fit, lw = 1.2, label = label, color = 'black')
-
-                # plot errors
-                if error_bar == True:
-                    ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, color = 'black')
-
-                # add legend
-                ax.legend(loc = 'best', frameon = False,framealpha=0.7, handlelength=0, handletextpad=0)
-
-            ############# end of combine differences   ############# 
-            ############# in loop modifications for both types of plot (combine = True OR False) #############   
-            plt.xscale('log')    
-                
-            # spines
-            ax.spines['right'].set_visible(False)
-            ax.spines['top'].set_visible(False)
             
-            # labels
-            ax.set_xlabel("[{}]".format(compound))
-            ax.set_title(title, x = 0, fontweight = '550')
-            
-            if use_normalised == False:
-                ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
-            else:
-                if activator == "":
-                    ax.set_ylabel("% of activation")
+            ########## TRY EXCEPT ##########
+            try:
+                if combine == False:
+                    fig, ax = plt.subplots(dpi = dpi)
+                # unpack curve_data:
+                x = val['x']
+                y = val['y']
+                yerr = val['yerr']
+                c50units = val['c50units']
+                popt = val['popt']
+                protein = val['protein']
+                compound = val['compound']
+                tb_str = ""
+                if show_top_bot == True:
+                    tb_str = "\nTop = {:.2f}\nBottom = {:.2f}".format(popt[0], popt[1])
+
+                # get x and y fits
+                fit_x = np.logspace(np.log10(x.min())-0.5, np.log10(x.max())+0.5, 300)
+                fit = func_dict[plot_func](fit_x, *popt)
+                ############################# types of plot: combine True OR False ####################
+                # TRUE
+                if combine == True:
+                    # get label for legend
+                    label = r"$\bf{}\ {}$".format(compound, "") +"\n{} = {:.2f} {}\nHill Slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
+
+                    # plot fit
+                    ax.plot(fit_x, fit, lw = 1.2, label = label, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
+
+                    # plot errors
+                    if error_bar == True:
+                        ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
+                # FALSE        
+                if combine == False:
+                    # get label for legend
+                    label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
+
+                    # plot fit
+                    ax.plot(fit_x, fit, lw = 1.2, label = label, color = 'black')
+
+                    # plot errors
+                    if error_bar == True:
+                        ax.errorbar(x, y, yerr, fmt='ko',capsize=3,ms=3, color = 'black')
+
+                    # add legend
+                    ax.legend(loc = 'best', frameon = False,framealpha=0.7, handlelength=0, handletextpad=0)
+
+                ############# end of combine differences   ############# 
+                ############# in loop modifications for both types of plot (combine = True OR False) #############   
+                plt.xscale('log')    
+
+                # spines
+                ax.spines['right'].set_visible(False)
+                ax.spines['top'].set_visible(False)
+
+                # labels
+                ax.set_xlabel("[{}] / {}".format(compound, conc_units))
+                ax.set_title(title, x = 0, fontweight = '550')
+
+                if use_normalised == False:
+                    ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
                 else:
-                    ax.set_ylabel("% of activation by {}".format(activator))
-            
-            # title
-            ax.set_title(title, x = 0, fontweight = '550')
-            
-            plt.minorticks_off()
+                    if activator == "":
+                        ax.set_ylabel("% of activation")
+                    else:
+                        ax.set_ylabel("% of activation by {}".format(activator))
+
+                # title
+                ax.set_title(title, x = 0, fontweight = '550')
+
+                plt.minorticks_off()
+            except:
+                print("exception")
         ###################################### end of plotting loop ##########################        
         # post loop mods
         
@@ -714,11 +750,11 @@ class CaFlexPlate:
         # using plt legend allows use of loc = 'best' to prevent annotation clashing with line
         if combine == True:
             leg = ax.legend(loc = 'center left', frameon = False, bbox_to_anchor = [1.0, 0.5])
-            ax.set_xlabel("Concentration")
+            ax.set_xlabel("Concentration / {}".format(conc_units))
         plt.show()
         
         
-    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, show_top_bot = False, **kwargs):
+    def plot_curve(self, plot_func, use_normalised = False, n = 5, proteins = [], compounds = [], error_bar = True, cmap = "Dark2", combine = False, activator = " ", title = " ", dpi = 120, show_top_bot = False, conc_units = 'M', **kwargs):
         """Plots fitted curve using logistic regression with errors and IC50/EC50 values.
         
         :param plot_func: Plot function to use, either ic50 or ec50
@@ -743,10 +779,11 @@ class CaFlexPlate:
         :type dpi: int
         :param show_top_bot: 'True' shows the top and bottom curve fitting values in the legend
         :type show_top_bot: bool
+        :param conc_units: Units displayed on x axis of graph
+        :type conc_units: str
         :param **kwargs: Additional curve fitting arguments
         """         
         curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
-        
-        # do plots
-        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot)
-        
+
+    # do plots
+        self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, conc_units)
