@@ -3,6 +3,8 @@ from calciumflexanalysis import calcium_flex as cal
 from collections import defaultdict
 import pandas as pd 
 import matplotlib.pyplot as plt
+from datetime import date
+import copy
 
 class CaFlexGroup:
     """Class used for the analysis of multiple Calcium Flex well plates.
@@ -414,6 +416,72 @@ class CaFlexGroup:
         if combine_plates == True:
             curve_data = self.collate_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
             
+            # add curve data as object attribute
+            self.curve_data = curve_data
+            for k in self.curve_data.keys():
+                self.curve_data[k]['plot_func'] = plot_func
+            
+            
             # use static method in calcium_flex to plot
             cal.CaFlexPlate._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, conc_units)
     
+    def export_data(self, combine_plates = False, title = ""):
+        """Exports raw and processed data to an excel file. 
+        
+        The excel file will be named after the 'self.title' parameter unless otherwise specified. Combining the data will calulate and generate the curve fit values that correspond to those used when combine_plates = True in plot_conditions. It is recommended that the user set the title if combine = True.
+        
+        :param combine_plates: Combines data from each plate to the same document, default = False
+        :type combine_plates: bool
+        :param title: Title of the excel file, default = self.title + '_data_export.xlsx'
+        :type title: str
+        :return: Excel document
+        :rtype: .xlsx
+        """
+        if combine_plates == False:
+            for key, val in enumerate(self.caflexplates):
+#                 if title[-5:] != '.xlsx':
+#                     title = title + '.xlsx'
+                if title == "":
+                    val.export_data()
+                else:
+                    val.export_data("{}_{}".format(key, title))
+                print("Plate {} data exported as {}".format(key+1, title))
+        if combine_plates == True:
+            # set title
+            if title == "":
+                title = date.today().strftime("%d-%m-%Y") + "_combined_data_" + '.xlsx'
+                
+            # get curve data 
+            curve_dict = {}
+
+            if hasattr(self, 'curve_data'):
+                for key, val in self.curve_data.items(): # get curve data for each protein/compound combo
+                    curve = copy.deepcopy(val) # get deep copy - prevents original dict from being edited
+                    curve['popt_keys'] = ['top', 'bottom', curve['plot_func'], 'hill'] # add popt index
+                    for i in ['compound', 'protein', 'c50units', 'plot_func']: # delete irrelevent keys
+                        curve.pop(i)
+                    curve_df = pd.DataFrame.from_dict(curve, orient = 'index')
+
+                    curve_dict[key] = curve_df
+            
+                    
+            # unpack data dictionary and upload to excel:
+            with pd.ExcelWriter(title) as writer:
+                for k1, v1 in self.data.items():
+                    if isinstance(v1, pd.DataFrame):
+                        v1.to_excel(writer, sheet_name = k1)
+                    for k2, v2 in v1.items():
+                        if isinstance(v2, pd.DataFrame):
+                            v2.to_excel(writer, sheet_name = k1 + "_" + k2)
+                        for k3, v3 in v2.items():
+                            if isinstance(v3, pd.DataFrame):
+                                v3.to_excel(writer, sheet_name = k1 + "_" + k2 + "_" + k3)
+                # export curve data for each protein/compund combination
+                for key, val in curve_dict.items():
+                    key = key.translate({ord(i): None for i in "[]:*?/" }) # get rid of invalid characters
+                    val.to_excel(writer, sheet_name = key + '_curve_data')
+                    
+                    
+            print("Combined plate data exported as {}".format(title))
+            
+            
