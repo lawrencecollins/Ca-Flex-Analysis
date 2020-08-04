@@ -6,6 +6,7 @@ import string, math
 from platemapping import plate_map as pm
 import matplotlib.patches as mpl_patches
 from scipy.optimize import curve_fit
+import copy
 
 # define custom errors
 
@@ -14,6 +15,8 @@ class Error(Exception):
 class CompoundNameError(pm.PlateMapError):
     pass
 class ProteinNameError(pm.PlateMapError):
+    pass
+class UnitsError(pm.PlateMapError):
     pass
 class DataError(Error):
     pass
@@ -115,8 +118,8 @@ class CaFlexPlate:
         # optional title param
         self.title = title
         # add default title
-        if len(title) == 0:
-            self.title = raw_data[:-4] # change to experiment title in plate map?
+        if self.title == "":
+            self.title = self.raw_data[:-4] # change to experiment title in plate map?
             
         # check params
         if wells.get(self.size) == None:
@@ -560,26 +563,46 @@ class CaFlexPlate:
 
                         control_time = time[time['Type'].str.contains('control') == True]
                         control_time = control_time[(control_time['Protein'] == pval)].iloc[:, -data_length:]
+                        
 
                     # stops empty rows being plotted
                     if (pval != 'none') & (cval != 'none'):
 
                         fig, ax = plt.subplots(dpi = 120)
-
+                        
+                        # check units!
+                        if len(index['Concentration Units'].unique()) > 1 :
+                            raise UnitsError
+                        # if units are fine, get units!
+                        unique_units = index['Concentration Units'].unique()[0]
+                        
                         # control 
                         if control == True:
-                            ctrl_label = "0 {} (control)".format(platemap['Concentration Units'][(platemap['Type'] == 'control') & (platemap['Protein'] == pval)].unique()[0])
-                            ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', mfc = 'white', lw = 1, zorder = 2, label = ctrl_label)
+                            # convert u to mu
+                            if unique_units[0] == 'u':
+                                ctrl_label = "0 " + "$\mathrm{\mu }$" + unique_units[1:] + " (control)"
+                            else:
+                                ctrl_label = "0 {} (control)".format(unique_units)
+
+                            ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', 
+                                    mfc = 'white', lw = 1, zorder = 2, label = ctrl_label)
 
                     # plot series, iterating down rows
                         for i in range(len(time_temp)):
+                            # get legend labels
+                            if unique_units[0] == 'u':
+                                legend_label = "{} ".format(data_temp.index[i]) + "$\mathrm{\mu }$" + unique_units[1:]
+                            else:
+                                legend_label = "{} {}".format(data_temp.index[i], unique_units)
+                                
+                            # plot each condition
                             if error == True:
                                 ax.errorbar(x = time_temp.iloc[i], y = data_temp.iloc[i], yerr = yerr_temp.iloc[i],
                                            capsize = 3, zorder=1, color = plot_color(data_temp, cmap, i),
-                                           label = "{}".format(data_temp.index[i]))
+                                           label = legend_label)
                             else: 
-                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker, zorder=1, label = "{} {}".format(data_temp.index[i], index['Concentration Units'].iloc[i]),
-                                       ms = 5, color = plot_color(data_temp, cmap, i))
+                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker, zorder=1, label = legend_label, 
+                                        ms = 5, color = plot_color(data_temp, cmap, i))
 
                             # add legend    
                             ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{}".format(cval))
@@ -624,7 +647,9 @@ class CaFlexPlate:
                             ax.axvspan(xmin, xmax, facecolor = window_color, alpha = 0.5)
 
                     plt.show()
-                    
+                except UnitsError:
+                    print("{}, {} failed".format(pval, cval))
+                    print("too many units: {}".format(index['Concentration Units'].unique()))
                 except:
                     print("{}, {} failed".format(pval, cval))
 
@@ -789,7 +814,14 @@ class CaFlexPlate:
                 # TRUE
                 if combine == True:
                     # get label for legend
-                    label = r"$\bf{}\ {}$".format(compound, "") +"\n{} = {:.2f} {}\nHill Slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
+                    
+                    # convert u to mu 
+                    if c50units[0] == 'u':
+                        label = r"$\bf{}\ {}$ ".format(compound, "") + "\n{} = {:.2f}".format(legend_label[plot_func], popt[2]) + "$\mathrm{\mu }$" 
+                        + "{}".format(c50units[1:]) + "\nHill Slope = {:.2f}".format(popt[3])+tb_str
+                        
+                    else:
+                        label = r"$\bf{}\ {}$".format(compound, "") +"\n{} = {:.2f} {}\nHill Slope = {:.2f}".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
 
                     # plot fit
                     ax.plot(fit_x, fit, lw = 1.2, label = label, color = get_color(list(curve_data.keys()), cmap, "{}_{}".format(protein, compound)))
@@ -800,7 +832,12 @@ class CaFlexPlate:
                 # FALSE        
                 if combine == False:
                     # get label for legend
-                    label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
+                    
+                    # convert u to mu 
+                    if c50units[0] == 'u':
+                        label = "\n{} = {:.2f} ".format(legend_label[plot_func], popt[2]) + "$\mathrm{\mu }$" + "{}".format(c50units[1:]) + "\nHill Slope = {:.2f}".format(popt[3])+tb_str
+                    else:
+                        label = "{} = {:.2f} {}\nHill Slope = {:.2f} ".format(legend_label[plot_func], popt[2], c50units, popt[3])+tb_str
 
                     # plot fit
                     ax.plot(fit_x, fit, lw = 1.2, label = label, color = 'black')
@@ -879,6 +916,63 @@ class CaFlexPlate:
         :param **kwargs: Additional curve fitting arguments
         """         
         curve_data =  self._get_curve_data(plot_func, use_normalised, n, proteins, compounds, **kwargs)
+        
+        # update object with curve data to access when exporting
+        self.curve_data = curve_data
+        for key in self.curve_data.keys():
+            self.curve_data[key]['plot_func'] = plot_func # curve data maximal conc plot function
 
     # do plots
         self._plot_curve(curve_data, plot_func, use_normalised, n, proteins, compounds, error_bar, cmap, combine, activator, title, dpi, show_top_bot, conc_units)
+        
+        
+        
+    def export_data(self, title = ""):
+        """Exports raw and processed data to an excel file. 
+        
+        The excel file will be named after the 'self.title' parameter unless otherwise specified.
+        
+        :param title: Title of the excel file, default = self.title + '_data_export.xlsx'
+        :type title: str
+        :return: Excel document
+        :rtype: .xlsx
+        """
+        if title == "":
+            title = self.title + '_data_export.xlsx'
+        if title[-5:] != '.xlsx':
+            title = title + '.xlsx'
+            
+        dfs = self.processed_data
+        
+        # get curve data
+        curve_list = {}
+        
+        if hasattr(self, 'curve_data'):
+            for key, val in self.curve_data.items(): # get curve data for each protein/compound combo
+                curve = copy.deepcopy(val) # get deep copy - prevents original dict from being edited
+                curve['popt_keys'] = ['top', 'bottom', curve['plot_func'], 'hill'] # add popt index
+                for i in ['compound', 'protein', 'c50units', 'plot_func']: # delete irrelevent keys
+                    curve.pop(i)
+                curve_df = pd.DataFrame.from_dict(curve, orient = 'index')
+                
+                curve_list[key] = curve_df
+    
+    
+        # create separate sheet for each data set
+        with pd.ExcelWriter(title) as writer:
+            dfs['ratio']['time'].to_excel(writer, sheet_name = 'time')
+            dfs['ratio']['data'].to_excel(writer, sheet_name = 'ratio')
+            dfs['baseline_corrected']['data'].to_excel(writer, sheet_name = 'baseline_corrected')
+            if 'data' in dfs['plateau'].keys():
+                dfs['plateau']['data'].to_excel(writer, sheet_name = 'plateau')
+            if 'data_normed' in dfs['plateau'].keys():
+                dfs['plateau']['data'].to_excel(writer, sheet_name = 'normalised_plateau')
+            if 'mean_amplitudes' in dfs.keys():
+                dfs['mean_amplitudes'].to_excel(writer, sheet_name = 'mean_amplitudes')
+            self.plate_map.to_excel(writer, sheet_name = 'plate_map')
+            
+            # export curve data for each protein/compund combination
+            for key, val in curve_list.items():
+                val.to_excel(writer, sheet_name = key + '_curve_data')
+                
+        print("Data exported to excel! Check your folder.")
