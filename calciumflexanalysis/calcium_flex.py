@@ -7,9 +7,9 @@ from platemapping import plate_map as pm
 import matplotlib.patches as mpl_patches
 from scipy.optimize import curve_fit
 import copy
+import itertools
 
 # define custom errors
-
 class Error(Exception):
     pass
 class CompoundNameError(pm.PlateMapError):
@@ -21,6 +21,8 @@ class UnitsError(pm.PlateMapError):
 class DataError(Error):
     pass
 class DataReadInError(DataError):
+    pass
+class ControlError(pm.PlateMapError):
     pass
 
 # define well plate dimensions
@@ -337,7 +339,7 @@ class CaFlexPlate:
 
         else:
             # plot multiple wells
-            fig, axs = plt.subplots(len(to_plot), 1, figsize = (2*len(to_plot), 4*len(to_plot)), constrained_layout = True, sharey = share_y)
+            fig, axs = plt.subplots(len(to_plot), 1, figsize = (2*len(to_plot), 3*len(to_plot)), constrained_layout = True, sharey = share_y)
 
             for i in range(len(to_plot)):
                 try:
@@ -357,6 +359,7 @@ class CaFlexPlate:
 
             # post try/except mods 
             fig.suptitle('Flex data versus time for the wells {}'.format(', '.join(to_plot)), y = 1.05, size = '20')
+            
             plt.show()
     
     def invalidate_wells(self, wells):
@@ -481,7 +484,7 @@ class CaFlexPlate:
         index = np.array(list(data_source['data'].columns))[window_filter]
         self.window =  (index[0], index[10])
         
-    def plot_conditions(self, data_type, activator = " ", show_window = False, dpi = 120, title = " ", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = [], marker = '-o'):
+    def plot_conditions(self, data_type, activator = " ", show_window = False, dpi = 120, title = " ", error = False, control = ['control'], cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = [], marker = 'o', unique_markers = False, marker_list = ["o", "^", "s", "D", "p", "*", "v"], show_control = True):
         """Plots each mean condition versus time.
         
         :param data_type: Data to be plotted, either 'ratio' or 'baseline_corrected'
@@ -496,7 +499,7 @@ class CaFlexPlate:
         :type title: str
         :param error: If True, plots error bars for each mean condition, default = False
         :type error: bool
-        :param control: If True, plots control data, default = True
+        :param control: List of control conditions, default = 'control'
         :type control: bool
         :param cmap: Colormap to use as the source of plot colors
         :type cmap: str
@@ -504,6 +507,11 @@ class CaFlexPlate:
         :type window_color: str
         :param marker: Marker type, default = '-o'
         :type marker: str
+        :param unique_markers: If True, plots each condition as a black line with a unique marker, default = False
+        :type unique_markers: bool
+        :param marker_list: List of marker symbols to use when unique_markers = True, default = ["o", "^", "s", "D", "p", "*", "v"]
+        :type marker_list: [str]
+        :param show_control: If True, plots each control condition for each protein, default = True
         :return: Figure displaying each mean condition versus time
         :rtype: fig
         """
@@ -511,7 +519,13 @@ class CaFlexPlate:
         platemap = self.plate_map
         grouplist = self.grouplist
         groupdct = {}
-
+        
+        # check control
+        # check controls are correct
+        for c in control:
+            if self.plate_map['Type'].isin([c]).any() == False:
+                raise ControlError("{} not in plate map".format(c))
+        
         for key, val in self.processed_data[data_type].items():
             data_length = val.shape[1]
             mapped = platemap.fillna('none').join(val)
@@ -527,131 +541,148 @@ class CaFlexPlate:
         # get names of proteins and compounds, excluding control
         if proteins == []:
             proteins = data[data['Type'].str.contains('control') == False]['Protein'].unique()
+            
         # iterate through proteins list
         for pkey, pval in enumerate(proteins):
             # get number of compounds for each protein
             if compounds == []:
                 compounds = data[(data['Type'].str.contains('control') == False) & (data['Protein'] == pval)]['Compound'].unique()
+                
             # iterate through compounds for each protein
-            for ckey, cval in enumerate(compounds):
-                
+            for ckey, cval in enumerate(compounds):                
                 # try each different combo
-                try:
-                
-                
-                    # extract data for each protein and compound, excluding control. 
-                    data_temp = data[data['Type'].str.contains('control') == False]
-                    data_temp = data_temp[(data_temp['Protein'] == pval) & (data_temp['Compound'] == cval)]
+#                 try:
+                # extract data for each protein and compound, excluding control. 
 
-                    time_temp = time[time['Type'].str.contains('control') == False]
-                    time_temp = time_temp[(time_temp['Protein'] == pval) & (time_temp['Compound'] == cval)]
+                data_temp = data[data['Type'].isin(control) == False]
+                data_temp = data_temp[(data_temp['Protein'] == pval) & (data_temp['Compound'] == cval)]
 
-                    yerr_temp = yerr[yerr['Type'].str.contains('control') == False]
-                    yerr_temp = yerr_temp[(yerr_temp['Protein'] == pval) & (yerr_temp['Compound'] == cval)]
+                time_temp = time[time['Type'].isin(control) == False]
+                time_temp = time_temp[(time_temp['Protein'] == pval) & (time_temp['Compound'] == cval)]
 
-                    templist = [x for x in grouplist if x != 'Concentration'] # get columns to remove
+                yerr_temp = yerr[yerr['Type'].isin(control) == False]
+                yerr_temp = yerr_temp[(yerr_temp['Protein'] == pval) & (yerr_temp['Compound'] == cval)]
 
-                    # extract just the data with conc as the index
-                    index = data_temp.iloc[:, :-data_length]
-                    data_temp = data_temp.set_index('Concentration').iloc[:, -data_length:]
-                    time_temp = time_temp.set_index('Concentration').iloc[:, -data_length:]
-                    yerr_temp = yerr_temp.set_index('Concentration').iloc[:, -data_length:]
+                templist = [x for x in grouplist if x != 'Concentration'] # get columns to remove
 
-                    if control == True:
-                        control_data = data[data['Type'].str.contains('control') == True]
-                        control_data = control_data[(control_data['Protein'] == pval)].iloc[:, -data_length:]
+                # extract just the data with conc as the index
+                index = data_temp.iloc[:, :-data_length]
+                data_temp = data_temp.set_index('Concentration').iloc[:, -data_length:]
+                time_temp = time_temp.set_index('Concentration').iloc[:, -data_length:]
+                yerr_temp = yerr_temp.set_index('Concentration').iloc[:, -data_length:]
 
-                        control_time = time[time['Type'].str.contains('control') == True]
-                        control_time = control_time[(control_time['Protein'] == pval)].iloc[:, -data_length:]
-                        
+                ########## PLOT ##########
+                if (pval != 'none') & (cval != 'none'):
+                    fig, ax = plt.subplots(dpi = 120)
 
-                    # stops empty rows being plotted
-                    if (pval != 'none') & (cval != 'none'):
+                    # check units!
+                    if len(index['Concentration Units'].unique()) > 1 :
+                        raise UnitsError
+                    # if units are fine, get units!
+                    unique_units = index['Concentration Units'].unique()[0]
 
-                        fig, ax = plt.subplots(dpi = 120)
-                        
-                        # check units!
-                        if len(index['Concentration Units'].unique()) > 1 :
-                            raise UnitsError
-                        # if units are fine, get units!
-                        unique_units = index['Concentration Units'].unique()[0]
-                        
-                        # control 
-                        if control == True:
+                    ########## control ##########
+                    ctrl_max_vals = []
+                    if show_control == True:
+                        for c in control:
+
+                            control_data = data[data['Type'].str.contains(c) == True]
+                            control_data = control_data[(control_data['Protein'] == pval)].iloc[:, -data_length:]
+
+                            control_time = time[time['Type'].str.contains(c) == True]
+                            control_time = control_time[(control_time['Protein'] == pval)].iloc[:, -data_length:]
+                            ctrl_max_vals.append(control_data.max().max())
+                            
                             # convert u to mu
                             if unique_units[0] == 'u':
-                                ctrl_label = "0 " + "$\mathrm{\mu }$" + unique_units[1:] + " (control)"
+                                ctrl_label = "0 " + "$\mathrm{\mu }$" + unique_units[1:] + " ({})".format(c)
                             else:
                                 ctrl_label = "0 {} (control)".format(unique_units)
 
-                            ax.plot(control_time.iloc[0], control_data.iloc[0], marker, color = 'black', 
-                                    mfc = 'white', lw = 1, zorder = 2, label = ctrl_label)
+                            ax.plot(control_time.iloc[0], control_data.iloc[0], marker, linestyle = '-', color = 'black', 
+                                    mfc = get_color(control, 'binary', c), lw = 1, zorder = 2, label = ctrl_label)
+
+                    ########## control end ##########
+
+                    markers = itertools.cycle(marker_list) # define unique markers for each line (unique_markers = True)
 
                     # plot series, iterating down rows
-                        for i in range(len(time_temp)):
-                            # get legend labels
-                            if unique_units[0] == 'u':
-                                legend_label = "{} ".format(data_temp.index[i]) + "$\mathrm{\mu }$" + unique_units[1:]
-                            else:
-                                legend_label = "{} {}".format(data_temp.index[i], unique_units)
-                                
-                            # plot each condition
-                            if error == True:
-                                ax.errorbar(x = time_temp.iloc[i], y = data_temp.iloc[i], yerr = yerr_temp.iloc[i],
-                                           capsize = 3, zorder=1, color = plot_color(data_temp, cmap, i),
-                                           label = legend_label)
-                            else: 
-                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker, zorder=1, label = legend_label, 
-                                        ms = 5, color = plot_color(data_temp, cmap, i))
-
-                            # add legend    
-                            ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{}".format(cval))
-
-                        # white background makes the exported figure look a lot nicer
-                        fig.patch.set_facecolor('white')
-
-                        # spines
-                        ax.spines['right'].set_visible(False)
-                        ax.spines['top'].set_visible(False)
-
-                        # add line representing the activator
-                        times = self.processed_data[data_type]['time'].mean() # get times
-                        time_filter = times > (self.inject - 5) # mean time series that contains activator
-
-                        # get start and end points
-                        injection_start = times[time_filter].iloc[0]
-                        injection_end = times[time_filter].iloc[-1]
-
-                        # add line indicating presence of activator
-                        if control_data.max().max() > data_temp.max().max():
-                            ymax = control_data.max().max() + control_data.max().max()*0.1
+                    for i in range(len(time_temp)):
+                        # get legend labels
+                        if unique_units[0] == 'u':
+                            legend_label = "{} ".format(data_temp.index[i]) + "$\mathrm{\mu }$" + unique_units[1:]
                         else:
-                            ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash w/ data
+                            legend_label = "{} {}".format(data_temp.index[i], unique_units)
 
-                        ax.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
+                        # plot each condition
+                        if error == True:
+                            ax.errorbar(x = time_temp.iloc[i], y = data_temp.iloc[i], yerr = yerr_temp.iloc[i],
+                                       capsize = 3, zorder=1, color = plot_color(data_temp, cmap, i),
+                                       label = legend_label)
+                        else: 
+                            if unique_markers == False:
+                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker = marker, linestyle = '-', zorder=1, label = legend_label, ms = 5, color = plot_color(data_temp, cmap, i), lw = 1)
+                            else:
+                                ax.plot(time_temp.iloc[i], data_temp.iloc[i], marker = next(markers), linestyle = '-', zorder=1, label = legend_label, ms = 4, color = 'black', lw = 1)
 
-                        # activator title
-                        ax.text((injection_start+injection_end)/2, (ymax+ymax*0.05), activator, ha = 'center')
+                        # add legend    
+                        ax.legend(loc = "upper left", bbox_to_anchor = (1.0, 1.0), frameon = False, title = "{}".format(cval))
 
-                        # assay title
-                        ax.set_title(title, x = 0, fontweight = '550')
+                    # white background makes the exported figure look a lot nicer
+                    fig.patch.set_facecolor('white')
 
-                        # axes labels
-                        ax.set_xlabel("time (s)")
-                        ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+                    # spines
+                    ax.spines['right'].set_visible(False)
+                    ax.spines['top'].set_visible(False)
 
-                        if show_window == True:
-                            # x min and x max for axvspan 
-                            xmin = time_temp.loc[:, self.window[0]].mean()
-                            xmax = time_temp.loc[:, self.window[1]].mean()
-                            ax.axvspan(xmin, xmax, facecolor = window_color, alpha = 0.5)
+                    # add line representing the activator
+                    times = self.processed_data[data_type]['time'].mean() # get times
+                    time_filter = times > (self.inject - 5) # mean time series that contains activator
 
-                    plt.show()
-                except UnitsError:
-                    print("{}, {} failed".format(pval, cval))
-                    print("too many units: {}".format(index['Concentration Units'].unique()))
-                except:
-                    print("{}, {} failed".format(pval, cval))
+                    # get start and end points
+                    injection_start = times[time_filter].iloc[0]
+                    injection_end = times[time_filter].iloc[-1]
+
+                    # add line indicating presence of activator
+                    if len(ctrl_max_vals) > 0: # make sure line is above plotted data!! 
+                        if max(ctrl_max_vals) > data_temp.max().max():
+                            ymax = control_data.max().max() + control_data.max().max()*0.1
+                    else:
+                        ymax = data_temp.max().max() + data_temp.max().max()*0.1 # add a bit extra to prevent clash
+
+                    ax.plot([injection_start, injection_end], [ymax, ymax], c = 'black')
+
+                    # activator title
+                    ax.text((injection_start+injection_end)/2, (ymax+ymax*0.05), activator, ha = 'center')
+
+                    # assay title
+                    ax.set_title(title, x = 0, fontweight = '550')
+
+                    # axes labels
+                    ax.set_xlabel("time (s)")
+                    ax.set_ylabel("$\mathrm{\Delta Ca^{2+} \ _i}$ (Ratio Units F340/F380)")
+
+                    # display plateau window
+                    if show_window == True:
+                        # x min and x max for axvspan 
+                        xmin = time_temp.loc[:, self.window[0]].mean()
+                        xmax = time_temp.loc[:, self.window[1]].mean()
+                        ax.axvspan(xmin, xmax, facecolor = window_color, alpha = 0.5)
+
+                    ########## PLOT END ##########
+
+                plt.show()
+
+                    # catch errors and notify user
+#                 except UnitsError:
+#                     print("{}, {} failed".format(pval, cval))
+#                     print("too many units: {}".format(index['Concentration Units'].unique()))
+#                 except ControlError:
+#                     for c in control:
+#                         if self.plate_map['Type'].isin([c]).any() == False:
+#                             print("{} not in plate map".format(c))
+#                 except:
+#                     print("{}, {} failed".format(pval, cval))
 
     def amplitude(self, data_type):
         """Calculates response amplitude for each condition, updates processed_data dictionary with 'plateau' and plate_map with amplitude column. 
@@ -692,6 +723,7 @@ class CaFlexPlate:
         # drop columns which can cause errors w/ groupby operations
         group.drop(['Valid', 'Column'], axis = 1, inplace = True)
         mean_response = group.groupby(self.grouplist).mean().reset_index()
+        
         if use_normalised == False:
             mean_response['Amplitude Error'] = group.groupby(self.grouplist).sem().reset_index().loc[:, 'Amplitude']
         else:
@@ -883,6 +915,10 @@ class CaFlexPlate:
         if combine == True:
             leg = ax.legend(loc = 'center left', frameon = False, bbox_to_anchor = [1.0, 0.5])
             ax.set_xlabel("Concentration / {}".format(conc_units))
+        
+        # set background
+        fig.patch.set_facecolor('white')
+        
         plt.show()
         
         
@@ -975,4 +1011,4 @@ class CaFlexPlate:
             for key, val in curve_list.items():
                 val.to_excel(writer, sheet_name = key + '_curve_data')
                 
-        print("Data exported to excel! Check your folder.")
+        print("Data exported to excel as {} Check your folder.".format(title))

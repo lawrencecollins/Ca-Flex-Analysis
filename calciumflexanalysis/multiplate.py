@@ -11,7 +11,6 @@ class CaFlexGroup:
     
     :param caflexplates: List of caflexplates to combine, generated from CaFlexPlate class
     :type caflexplates: list of calciumflexanalysis.calcium_flex.CaFlexPlates
-
     """
     
     def __init__(self, caflexplates = []):
@@ -208,7 +207,7 @@ class CaFlexGroup:
         
         print("self.data updated. See self.data[{}]['grouped']".format(data_type))
         
-    def plot_conditions(self, data_type, plate_number = True, activator = " ", show_window = False, dpi = 120, title = "", error = False, control = True, cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = []):
+    def plot_conditions(self, data_type, plate_number = True, activator = " ", show_window = False, dpi = 120, title = "", error = False, control = ['control'], cmap = "winter_r", window_color = 'hotpink', proteins = [], compounds = [], marker = 'o', unique_markers = False, marker_list = ["o", "^", "s", "D", "p", "*", "v"], show_control = True):
         """Plots each mean condition versus time, for either each plate or over all plates, for each compound and protein.
         
         If no title is desired, set title to " ".
@@ -232,12 +231,17 @@ class CaFlexGroup:
         :type cmap: str
         :param window_color: Color of the plateau window, default = 'hotpink'
         :type window_color: str
+        :param marker: Marker type, default = '-o'
+        :type marker: str
+        :param unique_markers: If True, plots each condition as a black line with a unique marker, default = False
+        :type unique_markers: bool
+        :param marker_list: List of marker symbols to use when unique_markers = True, default = ["o", "^", "s", "D", "p", "*", "v"]
+        :type marker_list: [str]
         :return: Figure displaying each mean condition versus time
         :rtype: fig
         """
         grouplist = self.grouplist
-        
-         
+
         for key, val in enumerate(self.caflexplates):
             try:
                 # sort titles
@@ -249,7 +253,7 @@ class CaFlexGroup:
                 else:
                     if title == "":
                         Title = val.title
-                val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds)
+                val.plot_conditions(data_type, activator, show_window, dpi, Title, error, control, cmap, window_color, proteins, compounds, marker, unique_markers, marker_list, show_control)
             except:
                 print("Plate {} plot failed".format(key+1))
                 
