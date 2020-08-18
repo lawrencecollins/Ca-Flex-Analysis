@@ -597,7 +597,7 @@ class CaFlexPlate:
                             if unique_units[0] == 'u':
                                 ctrl_label = "0 " + "$\mathrm{\mu }$" + unique_units[1:] + " ({})".format(c)
                             else:
-                                ctrl_label = "0 {} (control)".format(unique_units)
+                                ctrl_label = "0 {} ({})".format(unique_units, c)
 
                             ax.plot(control_time.iloc[0], control_data.iloc[0], marker, linestyle = '-', color = 'black', 
                                     mfc = get_color(control, 'binary', c), lw = 1, zorder = 2, label = ctrl_label)
