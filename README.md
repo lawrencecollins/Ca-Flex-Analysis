@@ -1,3 +1,2 @@
--In progress-
 
-Read and interpret photo affinity assay data from well plates. 
+Read and interpret calcium flux data from well plate assays. 
