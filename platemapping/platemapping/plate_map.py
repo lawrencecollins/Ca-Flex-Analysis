@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import string, math
 
-# DEFINE ERROR CLASSES
+# custom errors 
 class Error(Exception):
     pass
 class PlateMapError(Error):
@@ -16,8 +16,6 @@ class HeaderError(PlateMapError):
 header_names_short = ['Row', 'Start', 'End', 'Type', 'Contents', 'Compound', 'Protein', 'Concentration', 'Concentration Units']
 header_names_long = ['Well ID', 'Type', 'Contents', 'Compound', 'Protein', 'Concentration', 'Concentration Units']
 
-
-
 # we need to reference well plate dimensions  
 wells = {6:(2, 3), 12:(3, 4), 24:(4, 6), 48:(6, 8), 96:(8, 12), 384:(16, 24)} # dictionary of well sizes  
 
@@ -25,7 +23,7 @@ wells = {6:(2, 3), 12:(3, 4), 24:(4, 6), 48:(6, 8), 96:(8, 12), 384:(16, 24)} # 
 data_types = {'Well ID' : str, 'Compound' : str, 'Protein': str, 'Concentration' : float, 'Concentration Units' : str,
              'Contents' : str, 'Type' : str, 'Valid' : bool}
 
-# EMPTY MAP GENERATION
+# generate empty maps of defined size that can be updated with the contents of plate map templates
 def empty_map(size = 96, valid = True):
     """Returns an empty platemap of defined size.
     
@@ -101,8 +99,7 @@ def plate_map(file, size = 96, valid = True):
 
         # correct typos due to capitalisation and trailing spaces
         df['Type'] = df['Type'].str.lower()
-        df[['Contents', 'Compound', 'Protein', 'Type']] = df[['Contents', 'Compound', 
-                                                                          'Protein', 'Type']].stack().str.rstrip().unstack()
+        df[['Contents', 'Compound', 'Protein', 'Type']] = df[['Contents', 'Compound', 'Protein', 'Type']].stack().str.rstrip().unstack()
 
         # define empty plate map
         temp = empty_map(size = size, valid = valid)
@@ -135,6 +132,7 @@ def short_map(file, size = 96, valid = True):
         df = pd.read_csv(file, skiprows = 1, skipinitialspace = True)
         if list(df.columns) != header_names_short:
             raise HeaderError("Wrong headers!")
+            
         # generate empty dataframe to append with each duplicated row
         filleddf = pd.DataFrame()
 
@@ -165,8 +163,7 @@ def short_map(file, size = 96, valid = True):
         finalmap['Column'] = finalmap['Column'].astype(int)
         # correct typos due to capitalisation and trailing spaces
         finalmap['Type'] = finalmap['Type'].str.lower()
-        finalmap[['Contents', 'Compound', 'Protein', 'Type']] = finalmap[['Contents', 'Compound', 
-                                                                          'Protein', 'Type']].stack().str.rstrip().unstack()
+        finalmap[['Contents', 'Compound', 'Protein', 'Type']] = finalmap[['Contents', 'Compound', 'Protein', 'Type']].stack().str.rstrip().unstack()
 
         return finalmap
     
@@ -299,20 +296,20 @@ def visualise(platemap, title = "", size = 96, export = False, cmap = 'Paired',
                 # Well colour coding  
                 if platemap['Type'].iloc[i] == 'empty':
                     ax.add_artist(plt.Circle((0.5, 0.5), 0.49, edgecolor='black', fill = False, lw=0.5))
+                    # LABELS #
+                    # add 'empty' label
+                    ax.text(0.5, 0.5, 'empty', size = str(fontsize(sizeby = 'empty', plate_size = size)), wrap = True, ha = "center", va="center")
 
                 else:
-                    ax.add_artist(plt.Circle((0.5, 0.5), 0.49, facecolor=wellcolour(platemap, colorby, cmap, i), 
-                                              edgecolor=hatchdict[str(platemap['Valid'].iloc[i])][1], lw=0.5, 
-                                              hatch = hatchdict[str(platemap['Valid'].iloc[i])][0]))
+                    ax.add_artist(plt.Circle((0.5, 0.5), 0.49, facecolor=wellcolour(platemap, colorby, cmap, i), edgecolor=hatchdict[str(platemap['Valid'].iloc[i])][1], lw=0.5, hatch = hatchdict[str(platemap['Valid'].iloc[i])][0]))
 
-                # LABELS
-                ax = fig.add_subplot(grid[(ord(platemap['Row'].iloc[i].lower())-96), ((platemap['Column'].iloc[i]))])
+                    # LABELS 
+                    # nan option allows a blank label if there is nothing stipulated for this label condition
+                    if str(platemap[labelby].iloc[i]) != 'nan':
+                        ax.text(0.5, 0.5, labelwell(platemap, labelby, i), 
+                                size = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)), 
+                                wrap = True, ha = "center", va="center")
 
-                # nan option allows a blank label if there is nothing stipulated for this label condition
-                if str(platemap[labelby].iloc[i]) != 'nan':
-                    ax.text(0.5, 0.5, labelwell(platemap, labelby, i), 
-                            size = str(fontsize(sizeby = platemap[labelby].iloc[i], plate_size = size)), 
-                            wrap = True, ha = "center", va="center")
         # add title 
         plt.suptitle('{}'.format(title))
 
@@ -322,8 +319,6 @@ def visualise(platemap, title = "", size = 96, export = False, cmap = 'Paired',
     except:
         print('error!')
 
-
-        
 def visualise_all_series(x, y, platemap, share_y, size = 96, title = " ", export = False, cmap = 'Dark2_r',
              colorby = 'Type', labelby = 'Type', dpi = 200):
     """Returns a plot for each series, the location on the grid corresponding to the location of each assay on the well plate.

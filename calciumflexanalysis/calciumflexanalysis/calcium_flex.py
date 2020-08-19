@@ -28,9 +28,9 @@ class ControlError(pm.PlateMapError):
 # define well plate dimensions
 wells = {6:(2, 3), 12:(3, 4), 24:(4, 6), 48:(6, 8), 96:(8, 12), 384:(16, 24)} 
 
-def read_in(raw_data):
+def read_in(raw_data, skiprows, skipfooter):
     """Returns a dataframe of the old flex data."""
-    df = pd.read_csv(raw_data, delimiter='\t', skiprows = 2, skipfooter=3, engine = 'python', encoding = 'mbcs') # update to check headers if there is no title?
+    df = pd.read_csv(raw_data, delimiter='\t', skiprows = skiprows, skipfooter=skipfooter, engine = 'python', encoding = 'mbcs') # update to check headers if there is no title?
     return df
 
 def read_in_new(raw_data, skiprows, skipfooter):
@@ -143,7 +143,7 @@ class CaFlexPlate:
         """Returns a timemap and datamap as a tuple."""
         if self.data_type == 'old':
             try:
-                df = read_in(self.raw_data)
+                df = read_in(self.raw_data, self.skiprows, self.skipfooter)
                 # create new dataframe containing all time values for each well
                 dftime = df.filter(regex = 'T$', axis = 1)
                # edit header names (this will come in handy in a second)
