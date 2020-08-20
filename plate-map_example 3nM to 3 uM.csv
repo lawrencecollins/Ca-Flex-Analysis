@@ -1,0 +1,10 @@
+Experiment Title:,,Inhibitor Assay Example,,,,,,
+Row,Start,End,Type,Contents,Compound,Protein,Concentration,Concentration Units
+A,1,6,Control,Activator+DMSO,,TRPC5,,nM
+B,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,3,nM
+C,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,10,nM
+D,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,30,nM
+E,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,100,nM
+ F,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,300,nM
+G,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,1000,nM
+H,1,6,Compound,Activator+Inhibitor,Inhibitor,TRPC5,3000,nM
