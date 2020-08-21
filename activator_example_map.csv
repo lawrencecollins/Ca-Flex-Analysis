@@ -1,0 +1,10 @@
+Experiment Title:,,Activator Example Assay,,,,,,
+Row,Start,End,Type,Contents,Compound,Protein,Concentration,Concentration Units
+A,1,6,Control,DMSO,,TRPC5-SYFP2,0,nM
+B,1,6,Control2,EA,EA,TRPC5-SYFP2,10,nM
+C,1,6,Compound,activator,activator,TRPC5-SYFP2,300,nM
+D,1,6,Compound,activator,activator,TRPC5-SYFP2,100,nM
+E,1,6,Compound,activator,activator,TRPC5-SYFP2,30,nM
+ F,1,6,Compound,activator,activator,TRPC5-SYFP2,10,nM
+G,1,6,Compound,activator,activator,TRPC5-SYFP2,3,nM
+H,1,6,Compound,activator,activator,TRPC5-SYFP2,1,nM
